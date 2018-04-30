@@ -16,7 +16,7 @@ from sqlalchemy.dialects.mysql import (TINYINT as mysql_TINYINT,
 import multiprocessing as mp
 
 
-def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size=1000):
+def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     """
     Filling tables with data.
     """
@@ -29,18 +29,17 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size=1000):
     d_metadata.reflect(d_engine)
 
     table = o_metadata.tables[table_name]
-    pk = [c for c in table.primary_key.columns][0]
+    pks = [c for c in table.primary_key.columns]
+    pk = pks[0]
+    single_pk = True if len(pks) == 1 else False
 
-    # is first iteration?
-    first_it = True
     # Check if the table exists in migrated db, if needs to be completed and mark starting id
     try:
+        first_it = True
         d_table = d_metadata.tables[table_name]
         dpk = [c for c in d_table.primary_key.columns][0]
-        q = select([func.count(pk)])
-        dq = select([func.count(dpk)])
-        count = o_engine.execute(q).fetchone()[0]
-        d_count = d_engine.execute(dq).fetchone()[0]
+        count = o_engine.execute(select([func.count(pk)])).fetchone()[0]
+        d_count = d_engine.execute(select([func.count(dpk)])).fetchone()[0]
         # Nothing to do here
         if count == d_count:
             print(table_name, "is already migrated")
@@ -53,16 +52,16 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size=1000):
     except:
         print("need to create {} table before filling it".format(table_name))
 
-    while True:
-        q = select([table]).order_by(pk).limit(chunk_size)
+    if not single_pk:
         if not first_it:
-            q = q.where(pk > next_id)
+            offset = d_count
         else:
-            first_it = False
-        res = o_engine.execute(q)
-        data = res.fetchall()
-        if len(data):
-            next_id = data[-1].__getitem__(pk.name)
+            offset = 0
+        for ini in [x for x in range(offset, count-offset, chunk_size)]:
+            # use offset and limit, terrible performance.
+            q = select([table]).order_by(*pks).offset(ini).limit(chunk_size)
+            res = o_engine.execute(q)
+            data = res.fetchall()
             d_engine.execute(
                 table.insert(),
                 [
@@ -70,9 +69,27 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size=1000):
                     for row in data
                 ]
             )
-        else:
-            break
-    print(table_name, "is already migrated")
+    else:
+        while True:
+            q = select([table]).order_by(pk).limit(chunk_size)
+            if not first_it:
+                q = q.where(pk > next_id)
+            else:
+                first_it = False
+            res = o_engine.execute(q)
+            data = res.fetchall()
+            if len(data):
+                next_id = data[-1].__getitem__(pk.name)
+                d_engine.execute(
+                    table.insert(),
+                    [
+                        dict([(col_name, col_value) for col_name, col_value in zip(res.keys(), row)])
+                        for row in data
+                    ]
+                )
+            else:
+                break
+    print(table_name, "migrated")
     return True
 
 
@@ -146,7 +163,7 @@ class DbMigrator(object):
         return col
 
 
-    def copy_tables(self):
+    def migrate_tables(self):
         """
         Copy schema to anther db, as we are migrating from release schema we copy everything.
         """
@@ -160,13 +177,17 @@ class DbMigrator(object):
         for table_name, table in metadata.tables.items():
             # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT. Only 1 simultaneous process can write to it.
             # Keep only PKs for PostreSQL and MySQL. Restoring them after all data is copied.
-            keep_constraints = filter(lambda cons: isinstance(cons, PrimaryKeyConstraint), table.constraints)
+            keep_constraints = list(filter(lambda cons: isinstance(cons, PrimaryKeyConstraint), table.constraints))
             if d_engine.name == 'sqlite':
-                # TODO: check if can also keep check constraints in sqlite
                 uks = insp.get_unique_constraints(table_name)
                 for uk in uks:
                     uk_cols = filter(lambda c: c.name in uk['column_names'], table._columns)
                     keep_constraints.append(UniqueConstraint(*uk_cols, name=uk['name']))
+                for fk in filter(lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints):
+                    keep_constraints.append(fk)
+                for cc in filter(lambda cons: isinstance(cons, CheckConstraint), table.constraints):
+                    cc.sqltext = TextClause(str(cc.sqltext).replace("\"", ""))
+                    keep_constraints.append(cc)
                 table.constraints = set(keep_constraints)
             else:
                 table.constraints = set(keep_constraints)
@@ -199,7 +220,7 @@ class DbMigrator(object):
         if set(o_metadata.tables.keys()) != set(d_metadata.tables.keys()):
             return False
 
-        all_ok = True
+        validated = True
         o_s = Session(o_engine)
         d_s = Session(d_engine)
         for table_name, table in o_metadata.tables.items():
@@ -208,10 +229,10 @@ class DbMigrator(object):
                 print('Row count failed for table {}, {}, {}'.format(table_name,
                                                                      o_s.query(table).count(),
                                                                      d_s.query(migrated_table).count()))
-                all_ok = False
+                validated = False
         o_s.close()
         d_s.close()
-        return all_ok
+        return validated
 
 
     def migrate_constraints(self):
@@ -271,50 +292,61 @@ class DbMigrator(object):
                     print(e)
 
 
-    def migrate(self, copy_schema=True, copy_data=True, migrate_constraints=True, migrate_indexes=True):
-
+    def sort_tables(self):
+        """
+        Sort tables by FK dependency. 
+        SQLite cannot ALTER to add constraints and only supports one write process simultaneously.
+        """
         o_engine = create_engine(self.o_engine_conn)
-        d_engine = create_engine(self.d_engine_conn)
-
         metadata = MetaData()
         metadata.reflect(o_engine)
 
+        tables = [x[1] for x in metadata.tables.items()]
+        ordered_tables = []
+        # sort tables by fk dependency, required for sqlite
+        while tables:
+            current_table = tables[0]
+            all_fk_done = True
+            for fk in filter(lambda x: isinstance(x, ForeignKeyConstraint), current_table.constraints):
+                if fk.referred_table.name not in ordered_tables:
+                    all_fk_done = False
+            if all_fk_done:
+                ordered_tables.append(current_table.name)
+                # delete first element of the list(current table) after data is copied
+                del tables[0]
+            else:
+                # put current table in last position of the list
+                tables.append(tables.pop(0))
+        return ordered_tables
+
+
+    def migrate(self, copy_schema=True, copy_data=True, copy_constraints=True, copy_indexes=True, chunk_size=1000):
+
+        d_engine = create_engine(self.d_engine_conn)
+
         # copy schema
         if copy_schema:
-            self.copy_tables()
+            self.migrate_tables()
 
         # copy data
         if copy_data:
-            tables = [x[1] for x in metadata.tables.items()]
-            ordered_tables = []
-            # sort tables by fk dependency, required for sqlite
-            while tables:
-                current_table = tables[0]
-                all_fk_done = True
-                for fk in filter(lambda x: isinstance(x, ForeignKeyConstraint), current_table.constraints):
-                    if fk.referred_table.name not in ordered_tables:
-                        all_fk_done = False
-                if all_fk_done:
-                    ordered_tables.append(current_table.name)
-                    # delete first element of the list(current table) after data is copied
-                    del tables[0]
-                else:
-                    # put current table in last position of the list
-                    tables.append(tables.pop(0))
-
-            # sqlite accepts concurrent read but not write
+            tables = self.sort_tables()
+            # SQLite accepts concurrent read but not write
             processes = 1 if d_engine.name == 'sqlite' else self.n_cores
             with mp.Pool(processes=processes) as pool:
-                pool.starmap(fill_table, [(self.o_engine_conn, self.d_engine_conn, x) for x in ordered_tables])
+                pool.starmap(fill_table, [(self.o_engine_conn, self.d_engine_conn, x, chunk_size) for x in tables])
 
         # check row counts for each table
-        all_migrated = self.validate_migration()
+        if not copy_data:
+            all_migrated = True
+        else:
+            all_migrated = self.validate_migration()
 
         # create constraints
         if all_migrated:
-            if migrate_constraints and d_engine.name != 'sqlite':
+            if copy_constraints and d_engine.name != 'sqlite':
                 self.migrate_constraints()
-            if migrate_indexes:
+            if copy_indexes:
                 self.migrate_indexes()
 
         return all_migrated

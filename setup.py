@@ -11,7 +11,7 @@ if __name__ == '__main__':
         url='',
         license='MIT',
         packages=['db_migrator', ],
-        long_description=open('README.rst').read(),
+        long_description=open('README.md').read(),
         install_requires=[
             'SQLAlchemy>=1.2',
         ],
