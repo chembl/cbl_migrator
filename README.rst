@@ -1,0 +1,1 @@
+Package to migrate Oracle DBs to MySQL, PostgreSQL and SQLite used for ChEMBL dumps.
