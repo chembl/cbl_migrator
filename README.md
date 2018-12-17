@@ -1,10 +1,40 @@
-Package to migrate Oracle DBs to MySQL, PostgreSQL and SQLite used for ChEMBL dumps.
+# DB Migrator
 
+Small library that migrates Oracle DBs to MySQL, PostgreSQL and SQLite. Used in ChEMBL dumps generation.
+
+Copies the schema, tables content, constraints and indexes from Oracle to another RDBMS.
+
+
+to use it:
 
 ```
 from db_migrator import DbMigrator
 
-migrator = DbMigrator('oracle://user:pass@ora-vm-065.ebi.ac.uk:1531/Chempro', postgresql://user:pass@porta-chembl-2.windows.ebi.ac.uk:5432/chembl_24)
+origin = 'oracle://{user}:{pass}@{host}:{port}/{sid}'
+dest = 'postgresql://{user}:{pass}@{host}:{port}/{dbname}'
+
+migrator = DbMigrator(origin, dest)
 migrator.migrate()
 
 ```
+
+
+## Concurrency
+
+Sqlite can't:
+
+- concurrently write
+- alter table ADD CONSTRAINT
+
+So only one core is used when migrating to it. All constraints are generated at the time of generating the destination schema so it sequentially inserts in tables in correct FKs order.
+
+
+As MySQL and PostgreSQL can do both things, only PKs are generated when migrating the schema.
+Tables are safely filled in parallel without FK constraints. After tables are filled all constraints are restored.
+
+
+## Incompatibilities
+
+DB Migrator always tries to find the best conversion type and also tries to create all existing indexes/constraints. 
+
+If due to any RDBMS difference (ex: limit in characters to create an index) an object cannot be recreated in the destination RDBMS, the object will be skipped and the issue logged.
