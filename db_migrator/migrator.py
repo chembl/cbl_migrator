@@ -164,7 +164,7 @@ class DbMigrator(object):
 
         # replace oracle sysdate with current_timestamp, compatible with postgresql
         if isinstance(col.type, DateTime):
-            if hasattr(col.server_default, arg):
+            if hasattr(col.server_default, 'arg'):
                 if col.server_default.arg.text == 'sysdate':
                     col.server_default.arg.text = 'current_timestamp'
 
