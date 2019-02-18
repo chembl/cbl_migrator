@@ -298,8 +298,7 @@ class DbMigrator(object):
         insp = inspect(o_engine)
 
         for table_name, table in metadata.tables.items():
-            keep_constraints = []
-
+            constraints_to_keep = []
             # keep unique constraints
             uks = insp.get_unique_constraints(table_name)
             for uk in uks:
@@ -307,21 +306,21 @@ class DbMigrator(object):
                     lambda c: c.name in uk['column_names'], table._columns)
                 uuk = UniqueConstraint(*uk_cols, name=uk['name'])
                 uuk._set_parent(table)
-                keep_constraints.append(uuk)
+                constraints_to_keep.append(uuk)
 
             # keep check constraints
             ccs = filter(lambda cons: isinstance(
                 cons, CheckConstraint), table.constraints)
             for cc in ccs:
                 cc.sqltext = TextClause(str(cc.sqltext).replace("\"", ""))
-                keep_constraints.append(cc)
+                constraints_to_keep.append(cc)
 
             # keep fks
             for fk in filter(lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints):
-                keep_constraints.append(fk)
+                constraints_to_keep.append(fk)
 
             # create all constraints
-            for cons in keep_constraints:
+            for cons in constraints_to_keep:
                 try:
                     d_engine.execute(AddConstraint(cons))
                 except Exception as e:
