@@ -44,7 +44,7 @@ logger.addHandler(handler)
 
 def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     """
-    Fills existing tables in dest with origin data.
+    Fills existing table in dest with origin table data.
     """
     logger.info('Migrating {} table'.format(table_name))
     o_engine = create_engine(o_engine_conn)
