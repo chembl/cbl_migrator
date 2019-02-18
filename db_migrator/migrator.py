@@ -1,4 +1,3 @@
-from sqlalchemy import UniqueConstraint, ForeignKeyConstraint, CheckConstraint, MetaData, PrimaryKeyConstraint, func, create_engine, inspect
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.base import ColumnCollection
 from sqlalchemy.util._collections import immutabledict
@@ -13,7 +12,16 @@ from sqlalchemy.dialects.mysql import (TINYINT as mysql_TINYINT,
                                        INTEGER as mysql_INTEGER,
                                        BIGINT as mysql_BIGINT
                                        )
-import multiprocessing as mp
+from sqlalchemy import (UniqueConstraint,
+                        ForeignKeyConstraint,
+                        CheckConstraint,
+                        MetaData,
+                        PrimaryKeyConstraint,
+                        func,
+                        create_engine,
+                        inspect)
+from multiprocessing import cpu_count
+import concurrent.futures as cf
 import logging
 
 
@@ -25,7 +33,8 @@ logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler('db_migrator.log')
 handler.setLevel(logging.DEBUG)
 # create a logging format
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 # add the handlers to the logger
 logger.addHandler(handler)
@@ -59,7 +68,8 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         d_count = d_engine.execute(select([func.count(dpk)])).fetchone()[0]
         # Nothing to do here
         if count == d_count:
-            logger.info('{} table exists in dest and has same counts than same table in origin. Skipping.')
+            logger.info(
+                '{} table exists in dest and has same counts than same table in origin. Skipping.')
             return True
         elif count != d_count and d_count != 0:
             q = select([d_table]).order_by(dpk.desc()).limit(1)
@@ -67,7 +77,8 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             next_id = res.fetchone().__getitem__(dpk.name)
             first_it = False
     except:
-        logger.info('Need to create {} table before filling it'.format(table_name))
+        logger.info(
+            'Need to create {} table before filling it'.format(table_name))
 
     # table has a composite pk (usualy a bad design choice), uses offset and limit to copy data
     # from origin to dest
@@ -84,7 +95,8 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             d_engine.execute(
                 table.insert(),
                 [
-                    dict([(col_name, col_value) for col_name, col_value in zip(res.keys(), row)])
+                    dict([(col_name, col_value)
+                          for col_name, col_value in zip(res.keys(), row)])
                     for row in data
                 ]
             )
@@ -103,7 +115,8 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
                 d_engine.execute(
                     table.insert(),
                     [
-                        dict([(col_name, col_value) for col_name, col_value in zip(res.keys(), row)])
+                        dict([(col_name, col_value)
+                              for col_name, col_value in zip(res.keys(), row)])
                         for row in data
                     ]
                 )
@@ -119,11 +132,10 @@ class DbMigrator(object):
     d_engine_conn = None
     n_cores = None
 
-    def __init__(self, o_conn_string, d_conn_string, n_cores=mp.cpu_count()):
+    def __init__(self, o_conn_string, d_conn_string, n_workers=cpu_count()):
         self.o_engine_conn = o_conn_string
         self.d_engine_conn = d_conn_string
-        self.n_cores = n_cores
-
+        self.n_cores = n_workers
 
     def fix_column_type(self, col, db_engine):
         """
@@ -182,10 +194,10 @@ class DbMigrator(object):
                 col.type.length = 100000
         return col
 
-
-    def migrate_tables(self):
-        """
-        Copy schema to anther db, as we are migrating from release schema we copy everything.
+    def copy_schema(self):
+        """        
+        Copies the schema to dest db.
+        Copies all constraints in sqlite, only pk in mysql and postgres.
         """
         o_engine = create_engine(self.o_engine_conn)
         d_engine = create_engine(self.d_engine_conn)
@@ -195,14 +207,19 @@ class DbMigrator(object):
 
         new_metadata_tables = {}
         for table_name, table in metadata.tables.items():
-            # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT. Only 1 simultaneous process can write to it.
-            # Keep only PKs for PostreSQL and MySQL. Restoring them after all data is copied.
-            keep_constraints = list(filter(lambda cons: isinstance(cons, PrimaryKeyConstraint), table.constraints))
+            # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT. 
+            # Only 1 simultaneous process can write to it.
+            # Keep only PKs for PostreSQL and MySQL. 
+            # Restoring them after all data is copied.
+            keep_constraints = list(filter(lambda cons: isinstance(
+                cons, PrimaryKeyConstraint), table.constraints))
             if d_engine.name == 'sqlite':
                 uks = insp.get_unique_constraints(table_name)
                 for uk in uks:
-                    uk_cols = filter(lambda c: c.name in uk['column_names'], table._columns)
-                    keep_constraints.append(UniqueConstraint(*uk_cols, name=uk['name']))
+                    uk_cols = filter(
+                        lambda c: c.name in uk['column_names'], table._columns)
+                    keep_constraints.append(
+                        UniqueConstraint(*uk_cols, name=uk['name']))
                 for fk in filter(lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints):
                     keep_constraints.append(fk)
                 for cc in filter(lambda cons: isinstance(cons, CheckConstraint), table.constraints):
@@ -228,10 +245,9 @@ class DbMigrator(object):
         metadata.tables = immutabledict(new_metadata_tables)
         metadata.create_all(d_engine)
 
-
     def validate_migration(self):
         """
-        Checks that counts for all tables in origin an dest are equal
+        Checks that counts for all tables in origin an dest dbd are equal.
         """
         o_engine = create_engine(self.o_engine_conn)
         o_metadata = MetaData()
@@ -250,20 +266,19 @@ class DbMigrator(object):
             migrated_table = d_metadata.tables[table_name]
             if o_s.query(table).count() != d_s.query(migrated_table).count():
                 logger.info('Row count failed for table {}, {}, {}'.format(table_name,
-                                                                     o_s.query(table).count(),
-                                                                     d_s.query(migrated_table).count()))
+                                                                           o_s.query(
+                                                                               table).count(),
+                                                                           d_s.query(migrated_table).count()))
 
                 validated = False
         o_s.close()
         d_s.close()
         return validated
 
-
-    def migrate_constraints(self):
+    def copy_constraints(self):
         """
         Migrates constraints, UKs, CCs and FKs.
         """
-
         o_engine = create_engine(self.o_engine_conn)
         d_engine = create_engine(self.d_engine_conn)
         metadata = MetaData()
@@ -277,13 +292,15 @@ class DbMigrator(object):
             # keep unique constraints
             uks = insp.get_unique_constraints(table_name)
             for uk in uks:
-                uk_cols = filter(lambda c: c.name in uk['column_names'], table._columns)
+                uk_cols = filter(
+                    lambda c: c.name in uk['column_names'], table._columns)
                 uuk = UniqueConstraint(*uk_cols, name=uk['name'])
                 uuk._set_parent(table)
                 keep_constraints.append(uuk)
 
             # keep check constraints
-            ccs = filter(lambda cons: isinstance(cons, CheckConstraint), table.constraints)
+            ccs = filter(lambda cons: isinstance(
+                cons, CheckConstraint), table.constraints)
             for cc in ccs:
                 cc.sqltext = TextClause(str(cc.sqltext).replace("\"", ""))
                 keep_constraints.append(cc)
@@ -299,10 +316,9 @@ class DbMigrator(object):
                 except Exception as e:
                     logger.info(e)
 
-
-    def migrate_indexes(self):
+    def copy_indexes(self):
         """
-        Migrates the indexes.
+        Copies the indexes when it's possible.
         """
         o_engine = create_engine(self.o_engine_conn)
         d_engine = create_engine(self.d_engine_conn)
@@ -313,8 +329,10 @@ class DbMigrator(object):
 
         for table_name, table in metadata.tables.items():
             uks = insp.get_unique_constraints(table_name)
-            # UKs are internally implemented as a unique indexes. Don't create index if it exists a UK for that field.
-            indexes_to_keep = filter(lambda index: index.name not in [x['name'] for x in uks], table.indexes)
+            # UKs are internally implemented as a unique indexes. 
+            # Don't create index if it exists a UK for that field.
+            indexes_to_keep = filter(lambda index: index.name not in [
+                                     x['name'] for x in uks], table.indexes)
 
             for index in indexes_to_keep:
                 try:
@@ -322,11 +340,11 @@ class DbMigrator(object):
                 except Exception as e:
                     logger.info(e)
 
-
     def sort_tables(self):
         """
         Sort tables by FK dependency. 
-        SQLite cannot ALTER to add constraints and only supports one write process simultaneously.
+        SQLite cannot ALTER to add constraints 
+        and only supports one concurrent write process.
         """
         o_engine = create_engine(self.o_engine_conn)
         metadata = MetaData()
@@ -350,24 +368,35 @@ class DbMigrator(object):
                 tables.append(tables.pop(0))
         return ordered_tables
 
-
     def migrate(self, copy_schema=True, copy_data=True, copy_constraints=True, copy_indexes=True, chunk_size=1000):
         """
         Copies origin database to dest.
         """
         d_engine = create_engine(self.d_engine_conn)
 
-        # copy schema
+        # copy tables from origin to dest
         if copy_schema:
-            self.migrate_tables()
+            self.copy_schema()
 
-        # copy data
+        # fill tables in dest
         if copy_data:
             tables = self.sort_tables()
             # SQLite accepts concurrent read but not write
             processes = 1 if d_engine.name == 'sqlite' else self.n_cores
-            with mp.Pool(processes=processes) as pool:
-                pool.starmap(fill_table, [(self.o_engine_conn, self.d_engine_conn, x, chunk_size) for x in tables])
+
+            with cf.ProcessPoolExecutor(max_workers=processes) as exe:
+                futures = {exe.submit(fill_table, self.o_engine_conn, self.d_engine_conn, table, chunk_size):
+                           table for table in tables}
+
+            for future in cf.as_completed(futures):
+                table = futures[future]
+                try:
+                    res = future.result()
+                    if not res:
+                        logger.info(
+                            'Something went wrong when copying table {}: '.format(table))
+                except Exception as e:
+                    logger.info('Table {} worker died: '.format(table), e)
 
         # check row counts for each table
         if not copy_data:
@@ -375,12 +404,13 @@ class DbMigrator(object):
         else:
             all_migrated = self.validate_migration()
 
-        # create constraints
+        # copy constraints and indexes
         if all_migrated:
-            # don't migrate constraints in sqlite, we initially kept all of them as id doesn't support alter table ADD CONSTRAINT.
+            # do not migrate constraints in sqlite, we initially kept all of them as 
+            # it does not support alter table ADD CONSTRAINT.
             if copy_constraints and d_engine.name != 'sqlite':
-                self.migrate_constraints()
+                self.copy_constraints()
             if copy_indexes:
-                self.migrate_indexes()
+                self.copy_indexes()
 
         return all_migrated
