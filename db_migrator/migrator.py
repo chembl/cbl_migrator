@@ -135,10 +135,10 @@ class DbMigrator(object):
         n_workers: Number of processes.
 
     Methods
-        copy_schema: Runs a on memory similarity search
-        copy_constraints: Runs a on disk similarity search
-        copy_indexes: Runs a on memory substructure screenout
-        migrate: Runs a on disk substructure screenout
+        copy_schema: Copies tables to dest.
+        copy_constraints: Copies constraints to dest.
+        copy_indexes: Copies indexes to dest.
+        migrate: Migrates origin to dest.
     """
     o_engine_conn = None
     d_engine_conn = None
