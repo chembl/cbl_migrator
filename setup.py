@@ -1,17 +1,16 @@
 from setuptools import setup
 
-
 if __name__ == '__main__':
     setup(
         name='db_migrator',
-        version='0.11',
-        author='Eloy Felix',
+        version='0.0.1',
+        author='Eloy Félix',
         author_email='',
         description='Migrates Oracle dbs to PostgreSQL, MySQL and Sqlite',
         url='',
         license='MIT',
         packages=['db_migrator', ],
-        long_description=open('README.md').read(),
+        long_description=open('README.md', encoding='utf-8').read(),
         install_requires=[
             'SQLAlchemy>=1.2',
         ],
