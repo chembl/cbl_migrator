@@ -4,7 +4,7 @@ from sqlalchemy.util._collections import immutabledict
 from sqlalchemy.sql.elements import TextClause
 from sqlalchemy.schema import AddConstraint
 from sqlalchemy.sql import select
-from sqlalchemy.types import Numeric, Text, BigInteger, SmallInteger, Integer
+from sqlalchemy.types import Numeric, Text, BigInteger, SmallInteger, Integer, Date
 from sqlalchemy.dialects.oracle import NUMBER
 from sqlalchemy.dialects.mysql import (TINYINT as mysql_TINYINT,
                                        SMALLINT as mysql_SMALLINT,
@@ -161,6 +161,12 @@ class DbMigrator(object):
             if supercls.__name__ != supercls.__name__.upper() and not supercls.__name__.startswith('_'):
                 break
         col.type = col.type.adapt(cls)
+
+        # replace oracle sysdate with current_timestamp
+        if isinstance(col.type, Date):
+            if col.server_default.arg.text == 'sysdate':
+                col.server_default.arg.text = 'current_timestamp'
+
         if isinstance(col.type, Numeric):
             if col.type.scale == 0:
                 if db_engine == 'mysql':
