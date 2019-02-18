@@ -35,6 +35,6 @@ Tables are safely filled in parallel without FK constraints. After tables are fi
 
 ## Incompatibilities
 
-DB Migrator always tries to find the best conversion type and also creates all existing indexes/constraints when possible.
+DB Migrator always tries to find the best conversion type and it also creates all existing constraints/indexes when it is possible.
 
 If due to any RDBMS difference (ex: limit in characters to create an index) an object cannot be recreated in the destination RDBMS, the object will be skipped and the issue logged.
