@@ -44,7 +44,7 @@ logger.addHandler(handler)
 
 def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     """
-    Filling tables with data.
+    Fills existing tables in dest with origin data.
     """
     logger.info('Migrating {} table'.format(table_name))
     o_engine = create_engine(o_engine_conn)
@@ -127,7 +127,21 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
 
 
 class DbMigrator(object):
+    """Migrator class.
 
+    Migrates origin db to dest one.
+
+    Attributes:
+        o_conn_string: Origin DB connection string.
+        d_conn_string: Dest DB connection string.
+        n_workers: Number of processes.
+
+    Methods
+        copy_schema: Runs a on memory similarity search
+        copy_constraints: Runs a on disk similarity search
+        copy_indexes: Runs a on memory substructure screenout
+        migrate: Runs a on disk substructure screenout
+    """
     o_engine_conn = None
     d_engine_conn = None
     n_cores = None
@@ -137,10 +151,10 @@ class DbMigrator(object):
         self.d_engine_conn = d_conn_string
         self.n_cores = n_workers
 
-    def fix_column_type(self, col, db_engine):
+    def __fix_column_type(self, col, db_engine):
         """
         Adapt column types to the most reasonable generic types (ie. VARCHAR -> String)
-        Inspired in sqlacodegen.
+        Inspired on sqlacodegen.
         """
         cls = col.type.__class__
         for supercls in cls.__mro__:
@@ -235,7 +249,7 @@ class DbMigrator(object):
             new_metadata_cols = ColumnCollection()
             for col in table._columns:
                 col.comment = None
-                col = self.fix_column_type(col, d_engine.name)
+                col = self.__fix_column_type(col, d_engine.name)
                 # be sure that no column has auto-increment
                 col.autoincrement = False
                 new_metadata_cols.add(col)
@@ -318,7 +332,7 @@ class DbMigrator(object):
 
     def copy_indexes(self):
         """
-        Copies the indexes when it's possible.
+        Copies the indexes when it is possible.
         """
         o_engine = create_engine(self.o_engine_conn)
         d_engine = create_engine(self.d_engine_conn)
@@ -340,7 +354,7 @@ class DbMigrator(object):
                 except Exception as e:
                     logger.info(e)
 
-    def sort_tables(self):
+    def __sort_tables(self):
         """
         Sort tables by FK dependency. 
         SQLite cannot ALTER to add constraints 
@@ -380,7 +394,7 @@ class DbMigrator(object):
 
         # fill tables in dest
         if copy_data:
-            tables = self.sort_tables()
+            tables = self.__sort_tables()
             # SQLite accepts concurrent read but not write
             processes = 1 if d_engine.name == 'sqlite' else self.n_cores
 
