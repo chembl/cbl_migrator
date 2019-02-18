@@ -77,8 +77,9 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         logger.info(
             'Need to create {} table before filling it'.format(table_name))
 
-    # table has a composite pk (usualy a bad design choice), uses offset and limit to copy data
-    # from origin to dest
+    # table has a composite pk (usualy a bad design choice). 
+    # Uses offset and limit to copy data from origin to dest, 
+    # not v good performance.
     if not single_pk:
         if not first_it:
             offset = d_count
