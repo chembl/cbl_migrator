@@ -20,7 +20,7 @@ migrator.migrate()
 ```
 
 
-## Concurrency
+## SQLite
 
 Sqlite can't:
 
