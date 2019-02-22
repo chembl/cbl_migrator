@@ -66,7 +66,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         # Nothing to do here
         if count == d_count:
             logger.info(
-                '{} table exists in dest and has same counts than same table in origin. Skipping.')
+                '{} table exists in dest and has same counts than same table in origin. Skipping.'.format(table_name))
             return True
         elif count != d_count and d_count != 0:
             q = select([d_table]).order_by(dpk.desc()).limit(1)
@@ -144,10 +144,21 @@ class DbMigrator(object):
     d_engine_conn = None
     n_cores = None
 
-    def __init__(self, o_conn_string, d_conn_string, n_workers=cpu_count()):
+    def __init__(self, o_conn_string, d_conn_string, exclude=[], n_workers=cpu_count()):
         self.o_engine_conn = o_conn_string
         self.d_engine_conn = d_conn_string
         self.n_cores = n_workers
+
+        # exclude tables with no pk
+        o_engine = create_engine(self.o_engine_conn)
+        metadata = MetaData()
+        metadata.reflect(o_engine)
+        no_pk = []
+        for table_name, table in metadata.tables.items():
+            pks = [c for c in table.primary_key.columns]
+            if not pks:
+                no_pk.append(table_name)
+        self.exclude = exclude + no_pk
 
     def __fix_column_type(self, col, db_engine):
         """
@@ -226,6 +237,8 @@ class DbMigrator(object):
 
         new_metadata_tables = {}
         for table_name, table in metadata.tables.items():
+            if table_name in self.exclude:
+                continue
             # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT. 
             # Only 1 simultaneous process can write to it.
             # Keep only PKs for PostreSQL and MySQL. 
@@ -368,11 +381,14 @@ class DbMigrator(object):
         metadata = MetaData()
         metadata.reflect(o_engine)
 
-        tables = [x[1] for x in metadata.tables.items()]
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = [x[1] for x in tables]
+
         ordered_tables = []
         # sort tables by fk dependency, required for sqlite
         while tables:
             current_table = tables[0]
+            
             all_fk_done = True
             for fk in filter(lambda x: isinstance(x, ForeignKeyConstraint), current_table.constraints):
                 if fk.referred_table.name not in ordered_tables:
