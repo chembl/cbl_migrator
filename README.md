@@ -4,6 +4,7 @@ Small library that migrates Oracle DBs to MySQL, PostgreSQL and SQLite. Used in 
 
 Copies the schema, tables content, constraints and indexes from Oracle to another RDBMS.
 It WON'T MIGRATE any table without a defined PK. May hang if you have a table with no PK but a field with a UK being pointed as FK for another table.
+It WON'T MIGRATE server defaults.
 
 to use it:
 

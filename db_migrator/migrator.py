@@ -173,11 +173,7 @@ class DbMigrator(object):
                 break
         col.type = col.type.adapt(cls)
 
-        # replace oracle sysdate with current_timestamp, compatible with postgresql
-        if isinstance(col.type, DateTime):
-            if hasattr(col.server_default, 'arg'):
-                if col.server_default.arg.text.strip() == 'sysdate':
-                    col.server_default.arg.text = 'current_timestamp'
+        col.server_default = None
 
         if isinstance(col.type, Numeric):
             if col.type.scale == 0:
