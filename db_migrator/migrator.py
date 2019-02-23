@@ -32,7 +32,7 @@ logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler('db_migrator.log')
 handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    '%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
@@ -321,7 +321,8 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        for table_name, table in metadata.tables.items():
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        for table_name, table in tables:
             constraints_to_keep = []
             # keep unique constraints
             uks = insp.get_unique_constraints(table_name)
