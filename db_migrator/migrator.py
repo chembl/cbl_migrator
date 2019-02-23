@@ -285,14 +285,17 @@ class DbMigrator(object):
         d_metadata = MetaData()
         d_metadata.reflect(d_engine)
 
-        if set(o_metadata.tables.keys()) != set(d_metadata.tables.keys()):
+        o_tables = filter(lambda x: x[0] not in self.exclude, o_metadata.tables.items())
+        d_tables = filter(lambda x: x[0] not in self.exclude, d_metadata.tables.items())
+
+        if set(o_tables.keys()) != set(d_tables.keys()):
             return False
 
         validated = True
         o_s = Session(o_engine)
         d_s = Session(d_engine)
-        for table_name, table in o_metadata.tables.items():
-            migrated_table = d_metadata.tables[table_name]
+        for table_name, table in o_tables.items():
+            migrated_table = d_tables[table_name]
             if o_s.query(table).count() != d_s.query(migrated_table).count():
                 logger.info('Row count failed for table {}, {}, {}'.format(table_name,
                                                                            o_s.query(
@@ -418,7 +421,7 @@ class DbMigrator(object):
             with cf.ProcessPoolExecutor(max_workers=processes) as exe:
                 futures = {exe.submit(fill_table, self.o_engine_conn, self.d_engine_conn, table, chunk_size):
                            table for table in tables}
-                           
+
                 for future in cf.as_completed(futures):
                     table = futures[future]
                     try:
