@@ -444,6 +444,8 @@ class DbMigrator(object):
 
         # copy constraints and indexes
         if all_migrated:
+            logger.info(
+                'All tables succesfuly migrated')
             # do not migrate constraints in sqlite, we initially kept all of them as 
             # it does not support alter table ADD CONSTRAINT.
             if copy_constraints and d_engine.name != 'sqlite':
