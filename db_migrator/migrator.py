@@ -133,6 +133,7 @@ class DbMigrator(object):
     Attributes:
         o_conn_string: Origin DB connection string.
         d_conn_string: Dest DB connection string.
+        exclude: list of tables to not migrate.
         n_workers: Number of processes.
 
     Methods
