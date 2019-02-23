@@ -287,6 +287,8 @@ class DbMigrator(object):
 
         o_tables = filter(lambda x: x[0] not in self.exclude, o_metadata.tables.items())
         d_tables = filter(lambda x: x[0] not in self.exclude, d_metadata.tables.items())
+        o_tables = { table_name: table for table_name, table in o_tables }
+        d_tables = { table_name: table for table_name, table in d_tables }
 
         if set(o_tables.keys()) != set(d_tables.keys()):
             return False
