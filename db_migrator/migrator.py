@@ -365,7 +365,7 @@ class DbMigrator(object):
         for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
             # UKs are internally implemented as a unique indexes. 
-            # Don't create index if it exists a UK for that field.
+            # Do not create index if it exists a UK for that field.
             indexes_to_keep = filter(lambda index: index.name not in [
                                      x['name'] for x in uks], table.indexes)
 
