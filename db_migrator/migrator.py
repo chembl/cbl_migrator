@@ -174,6 +174,7 @@ class DbMigrator(object):
                 break
         col.type = col.type.adapt(cls)
 
+        # unset any server default value
         col.server_default = None
 
         if isinstance(col.type, Numeric):
