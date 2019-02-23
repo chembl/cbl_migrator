@@ -66,7 +66,8 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         # Nothing to do here
         if count == d_count:
             logger.info(
-                '{} table exists in dest and has same counts than same table in origin. Skipping.'.format(table_name))
+                '{} table exists in dest and has same counts than origin table. Skipping.'
+                .format(table_name))
             return True
         elif count != d_count and d_count != 0:
             q = select([d_table]).order_by(dpk.desc()).limit(1)
@@ -417,16 +418,16 @@ class DbMigrator(object):
             with cf.ProcessPoolExecutor(max_workers=processes) as exe:
                 futures = {exe.submit(fill_table, self.o_engine_conn, self.d_engine_conn, table, chunk_size):
                            table for table in tables}
-
-            for future in cf.as_completed(futures):
-                table = futures[future]
-                try:
-                    res = future.result()
-                    if not res:
-                        logger.info(
-                            'Something went wrong when copying table {}: '.format(table))
-                except Exception as e:
-                    logger.info('Table {} worker died: '.format(table), e)
+                           
+                for future in cf.as_completed(futures):
+                    table = futures[future]
+                    try:
+                        res = future.result()
+                        if not res:
+                            logger.info(
+                                'Something went wrong when copying table {}: '.format(table))
+                    except Exception as e:
+                        logger.info('Table {} worker died: '.format(table), e)
 
         # check row counts for each table
         if not copy_data:
