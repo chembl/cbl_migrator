@@ -450,5 +450,7 @@ class DbMigrator(object):
                 self.copy_constraints()
             if copy_indexes:
                 self.copy_indexes()
-
+        else:
+            logger.info(
+                'Table migration did not pass the validation, constraints and indexes not copied across')
         return all_migrated
