@@ -351,7 +351,7 @@ class DbMigrator(object):
 
     def copy_indexes(self):
         """
-        Copies the indexes when it is possible.
+        Creates indexes in dest when possible.
         """
         o_engine = create_engine(self.o_engine_conn)
         d_engine = create_engine(self.d_engine_conn)
@@ -360,7 +360,8 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        for table_name, table in metadata.tables.items():
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
             # UKs are internally implemented as a unique indexes. 
             # Don't create index if it exists a UK for that field.
