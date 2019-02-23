@@ -31,7 +31,7 @@ migrator.migrate()
 
 ## SQLite
 
-Sqlite can not:
+SQLite can not:
 
 - concurrently write
 - alter table ADD CONSTRAINT
