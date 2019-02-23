@@ -19,7 +19,7 @@ migrator.migrate()
 ## What it does (in order of events)
 
 - Copies tables from origin to dest using the closest data type for each field. No constraints except PK are initially copied across.
-- Data is migrated for origin to dest tables. In parallel.
+- Data is migrated from origin to dest tables. In parallel.
 - If the data migration is succesful, it generates first the constraints and then the indexes in dest table. Any index in a field with a previous created UK will be skipped (UKs are implemented as unique indexes).
 - It logs every time it was not possible to migrate an object. Ex: 
 
