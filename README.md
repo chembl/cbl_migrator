@@ -27,7 +27,7 @@ migrator.migrate()
 
 - It won't migrate any table without a defined PK. May hang with a table with no PK but a field with a UK being pointed as FK for another table.
 - It does not try to migrate server default values.
-- It does not set auto fields.
+- It does not set autoincremental fields.
 
 ## SQLite
 
