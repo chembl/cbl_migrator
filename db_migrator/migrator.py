@@ -28,6 +28,7 @@ import logging
 # ----------------------------------------------------------------------------------------------------------------------
 
 logger = logging.getLogger('db_migrator')
+logger.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
 fh = logging.FileHandler('db_migrator.log')
 fh.setLevel(logging.DEBUG)
