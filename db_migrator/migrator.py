@@ -28,13 +28,20 @@ import logging
 # ----------------------------------------------------------------------------------------------------------------------
 
 logger = logging.getLogger('db_migrator')
-logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler('db_migrator.log')
-handler.setLevel(logging.DEBUG)
+# create file handler which logs even debug messages
+fh = logging.FileHandler('db_migrator.log')
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.ERROR)
+# create formatter and add it to the handlers
 formatter = logging.Formatter(
     '%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+ch.setFormatter(formatter)
+fh.setFormatter(formatter)
+# add the handlers to logger
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -75,11 +82,11 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             next_id = res.fetchone().__getitem__(dpk.name)
             first_it = False
     except:
-        logger.info(
+        logger.error(
             'Need to create {} table before filling it'.format(table_name))
 
-    # table has a composite pk (usualy a bad design choice). 
-    # Uses offset and limit to copy data from origin to dest, 
+    # table has a composite pk (usualy a bad design choice).
+    # Uses offset and limit to copy data from origin to dest,
     # not v good performance.
     if not single_pk:
         if not first_it:
@@ -238,9 +245,9 @@ class DbMigrator(object):
         for table_name, table in metadata.tables.items():
             if table_name in self.exclude:
                 continue
-            # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT. 
+            # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT.
             # Only 1 simultaneous process can write to it.
-            # Keep only PKs for PostreSQL and MySQL. 
+            # Keep only PKs for PostreSQL and MySQL.
             # Restoring them after all data is copied.
             keep_constraints = list(filter(lambda cons: isinstance(
                 cons, PrimaryKeyConstraint), table.constraints))
@@ -287,10 +294,12 @@ class DbMigrator(object):
         d_metadata = MetaData()
         d_metadata.reflect(d_engine)
 
-        o_tables = filter(lambda x: x[0] not in self.exclude, o_metadata.tables.items())
-        d_tables = filter(lambda x: x[0] not in self.exclude, d_metadata.tables.items())
-        o_tables = { table_name: table for table_name, table in o_tables }
-        d_tables = { table_name: table for table_name, table in d_tables }
+        o_tables = filter(
+            lambda x: x[0] not in self.exclude, o_metadata.tables.items())
+        d_tables = filter(
+            lambda x: x[0] not in self.exclude, d_metadata.tables.items())
+        o_tables = {table_name: table for table_name, table in o_tables}
+        d_tables = {table_name: table for table_name, table in d_tables}
 
         if set(o_tables.keys()) != set(d_tables.keys()):
             return False
@@ -301,10 +310,11 @@ class DbMigrator(object):
         for table_name, table in o_tables.items():
             migrated_table = d_tables[table_name]
             if o_s.query(table).count() != d_s.query(migrated_table).count():
-                logger.info('Row count failed for table {}, {}, {}'.format(table_name,
-                                                                           o_s.query(
-                                                                               table).count(),
-                                                                           d_s.query(migrated_table).count()))
+                logger.error('Row count failed for table {}, {}, {}'
+                             .format(table_name,
+                                     o_s.query(
+                                         table).count(),
+                                     d_s.query(migrated_table).count()))
 
                 validated = False
         o_s.close()
@@ -322,7 +332,8 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             constraints_to_keep = []
             # keep unique constraints
@@ -350,7 +361,7 @@ class DbMigrator(object):
                 try:
                     d_engine.execute(AddConstraint(cons))
                 except Exception as e:
-                    logger.info(e)
+                    logger.error(e)
 
     def copy_indexes(self):
         """
@@ -363,10 +374,11 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
-            # UKs are internally implemented as a unique indexes. 
+            # UKs are internally implemented as a unique indexes.
             # Do not create index if it exists a UK for that field.
             indexes_to_keep = filter(lambda index: index.name not in [
                                      x['name'] for x in uks], table.indexes)
@@ -387,14 +399,15 @@ class DbMigrator(object):
         metadata = MetaData()
         metadata.reflect(o_engine)
 
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude, metadata.tables.items())
         tables = [x[1] for x in tables]
 
         ordered_tables = []
         # sort tables by fk dependency, required for sqlite
         while tables:
             current_table = tables[0]
-            
+
             all_fk_done = True
             for fk in filter(lambda x: isinstance(x, ForeignKeyConstraint), current_table.constraints):
                 if fk.referred_table.name not in ordered_tables:
@@ -433,10 +446,10 @@ class DbMigrator(object):
                     try:
                         res = future.result()
                         if not res:
-                            logger.info(
+                            logger.error(
                                 'Something went wrong when copying table {}: '.format(table))
                     except Exception as e:
-                        logger.info('Table {} worker died: '.format(table), e)
+                        logger.error('Table {} worker died: '.format(table), e)
 
         # check row counts for each table
         if not copy_data:
@@ -448,13 +461,13 @@ class DbMigrator(object):
         if all_migrated:
             logger.info(
                 'All tables succesfuly migrated')
-            # do not migrate constraints in sqlite, we initially kept all of them as 
+            # do not migrate constraints in sqlite, we initially kept all of them as
             # it does not support alter table ADD CONSTRAINT.
             if copy_constraints and d_engine.name != 'sqlite':
                 self.copy_constraints()
             if copy_indexes:
                 self.copy_indexes()
         else:
-            logger.info(
+            logger.error(
                 'Table migration did not pass the validation, constraints and indexes not copied across')
         return all_migrated
