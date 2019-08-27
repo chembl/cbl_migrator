@@ -9,8 +9,8 @@ to use it:
 ```python
 from db_migrator import DbMigrator
 
-origin = 'oracle://{user}:{pass}@{host}:{port}/{sid}'
-dest = 'postgresql://{user}:{pass}@{host}:{port}/{dbname}'
+origin = 'oracle://{user}:{pass}@{host}:{port}/{sid}?encoding=utf8'
+dest = 'postgresql://{user}:{pass}@{host}:{port}/{dbname}?client_encoding=utf8'
 
 migrator = DbMigrator(origin, dest, ['excluded_table1', 'excluded_table2'])
 migrator.migrate()
