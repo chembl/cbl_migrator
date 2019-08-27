@@ -10,7 +10,8 @@ from sqlalchemy.dialects.mysql import (TINYINT as mysql_TINYINT,
                                        SMALLINT as mysql_SMALLINT,
                                        MEDIUMINT as mysql_MEDIUMINT,
                                        INTEGER as mysql_INTEGER,
-                                       BIGINT as mysql_BIGINT
+                                       BIGINT as mysql_BIGINT,
+                                       MEDIUMTEXT as mysql_MEDIUMTEXT
                                        )
 from sqlalchemy import (UniqueConstraint,
                         ForeignKeyConstraint,
@@ -53,6 +54,10 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     """
     logger.info('Migrating {} table'.format(table_name))
     o_engine = create_engine(o_engine_conn)
+    # sqlalchemy wrongly shortens oracle col names if
+    # len(col_name) > 30 - 6. 
+    # It should only do only if col_name > 30
+    o_engine.dialect.max_identifier_length = 36
     o_metadata = MetaData()
     o_metadata.reflect(o_engine)
     d_engine = create_engine(d_engine_conn)
@@ -173,7 +178,7 @@ class DbMigrator(object):
     def __fix_column_type(self, col, db_engine):
         """
         Adapt column types to the most reasonable generic types (ie. VARCHAR -> String)
-        Inspired on sqlacodegen.
+        Borrowed from sqlacodegen.
         """
         cls = col.type.__class__
         for supercls in cls.__mro__:
@@ -186,6 +191,7 @@ class DbMigrator(object):
         # unset any server default value
         col.server_default = None
 
+        # refine types
         if isinstance(col.type, Numeric):
             if col.type.scale == 0:
                 if db_engine == 'mysql':
@@ -199,36 +205,23 @@ class DbMigrator(object):
                         col.type = mysql_INTEGER()
                     else:
                         col.type = mysql_BIGINT()
-                elif db_engine == 'oracle':
-                    if not col.type.precision:
-                        pres = 38
-                    else:
-                        if col.type.precision > 38:
-                            pres = 38
-                        else:
-                            pres = col.type.precision
-                    col.type = NUMBER(precision=pres, scale=0)
                 elif db_engine in ['postgresql', 'sqlite']:
-                    if not col.type.precision:
+                    if not col.type.precision or col.type.precision > 4:
                         col.type = col.type.adapt(BigInteger)
                     else:
                         if col.type.precision <= 2:
                             col.type = col.type.adapt(SmallInteger)
                         elif 2 < col.type.precision <= 4:
                             col.type = col.type.adapt(Integer)
-                        elif col.type.precision > 4:
-                            col.type = col.type.adapt(BigInteger)
             else:
                 if db_engine == 'mysql':
                     if not col.type.precision and not col.type.scale:
-                        # mysql max precision is 64
-                        col.type.precision = 64
-                        # mysql max scale is 30
-                        col.type.scale = 30
+                        col.type.precision = 64 # max mysql precision
+                        col.type.scale = 30 # max mysql scale
         elif isinstance(col.type, Text):
-            # Need mediumtext in mysql to store current CLOB we have in Oracle
+            # mediumtext should suffice in most cases
             if db_engine == 'mysql':
-                col.type.length = 100000
+                col.type = col.type.adapt(mysql_MEDIUMTEXT)
         return col
 
     def copy_schema(self):
