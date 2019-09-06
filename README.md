@@ -39,4 +39,4 @@ So only one core is used when migrating to it. All constraints are generated at 
 
 ## MySQL
 
-CLOBs are currently migrated to MEDIUMTEXT.
+CLOBs are migrated to LONGTEXT.

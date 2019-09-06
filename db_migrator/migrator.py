@@ -11,7 +11,7 @@ from sqlalchemy.dialects.mysql import (TINYINT as mysql_TINYINT,
                                        MEDIUMINT as mysql_MEDIUMINT,
                                        INTEGER as mysql_INTEGER,
                                        BIGINT as mysql_BIGINT,
-                                       MEDIUMTEXT as mysql_MEDIUMTEXT
+                                       LONGTEXT as mysql_LONGTEXT
                                        )
 from sqlalchemy import (UniqueConstraint,
                         ForeignKeyConstraint,
@@ -219,9 +219,8 @@ class DbMigrator(object):
                         col.type.precision = 64 # max mysql precision
                         col.type.scale = 30 # max mysql scale
         elif isinstance(col.type, Text):
-            # mediumtext should suffice in most cases
             if db_engine == 'mysql':
-                col.type = col.type.adapt(mysql_MEDIUMTEXT)
+                col.type = col.type.adapt(mysql_LONGTEXT)
         return col
 
     def copy_schema(self):
