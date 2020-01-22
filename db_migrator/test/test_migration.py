@@ -23,7 +23,6 @@ class TestCase(unittest.TestCase):
         stmt = table.insert([{"aa": x, "bb": "asdasda", "cc": 1} for x in range(1, 4353)])
         self.engine_origin.execute(stmt)
 
-
     def test_migration(self):
 
         origin = 'sqlite:///origin.db'
