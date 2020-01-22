@@ -3,7 +3,7 @@ from setuptools import setup
 if __name__ == '__main__':
     setup(
         name='db_migrator',
-        version='0.1.0',
+        version='0.1.1',
         author='Eloy Félix',
         author_email='eloyfelix@gmail.com',
         description='Migrates Oracle dbs to PostgreSQL, MySQL and Sqlite',
