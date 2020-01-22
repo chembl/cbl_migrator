@@ -427,11 +427,12 @@ class DbMigrator(object):
             o_engine = create_engine(self.o_engine_conn)
             metadata.reflect(o_engine)
             insp = inspect(o_engine)
+            tables_to_migrate = [table[0] for table in filter(lambda x: x[0] not in self.exclude, metadata.tables.items())]
             tables = [
                 table[0]
                 for table in insp.get_sorted_table_and_fkc_names()
                 if table[0]
-                in filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+                in tables_to_migrate
             ]
             # SQLite accepts concurrent read but not write
             processes = 1 if d_engine.name == "sqlite" else self.n_cores
