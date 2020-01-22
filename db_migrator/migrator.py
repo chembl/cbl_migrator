@@ -382,38 +382,6 @@ class DbMigrator(object):
                 except Exception as e:
                     logger.info(e)
 
-    def __sort_tables(self):
-        """
-        Sort tables by FK dependency. 
-        SQLite cannot ALTER to add constraints 
-        and only supports one concurrent write process.
-        """
-        o_engine = create_engine(self.o_engine_conn)
-        metadata = MetaData()
-        metadata.reflect(o_engine)
-
-        tables = filter(
-            lambda x: x[0] not in self.exclude, metadata.tables.items())
-        tables = [x[1] for x in tables]
-
-        ordered_tables = []
-        # sort tables by fk dependency, required for sqlite
-        while tables:
-            current_table = tables[0]
-
-            all_fk_done = True
-            for fk in filter(lambda x: isinstance(x, ForeignKeyConstraint), current_table.constraints):
-                if fk.referred_table.name not in ordered_tables:
-                    all_fk_done = False
-            if all_fk_done:
-                ordered_tables.append(current_table.name)
-                # delete first element of the list(current table) after data is copied
-                del tables[0]
-            else:
-                # put current table in last position of the list
-                tables.append(tables.pop(0))
-        return ordered_tables
-
     def migrate(self, copy_schema=True, copy_data=True, copy_constraints=True, copy_indexes=True, chunk_size=1000):
         """
         Copies origin database to dest.
@@ -426,7 +394,11 @@ class DbMigrator(object):
 
         # fill tables in dest
         if copy_data:
-            tables = self.__sort_tables()
+            metadata = MetaData()
+            o_engine = create_engine(self.o_engine_conn)
+            metadata.reflect(o_engine)
+            insp = inspect(o_engine)
+            tables = [table[0] for table in insp.get_sorted_table_and_fkc_names() if table[0]]
             # SQLite accepts concurrent read but not write
             processes = 1 if d_engine.name == 'sqlite' else self.n_cores
 
