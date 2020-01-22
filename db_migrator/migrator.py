@@ -6,21 +6,24 @@ from sqlalchemy.schema import AddConstraint
 from sqlalchemy.sql import select
 from sqlalchemy.types import Numeric, Text, BigInteger, SmallInteger, Integer, DateTime
 from sqlalchemy.dialects.oracle import NUMBER
-from sqlalchemy.dialects.mysql import (TINYINT as mysql_TINYINT,
-                                       SMALLINT as mysql_SMALLINT,
-                                       MEDIUMINT as mysql_MEDIUMINT,
-                                       INTEGER as mysql_INTEGER,
-                                       BIGINT as mysql_BIGINT,
-                                       LONGTEXT as mysql_LONGTEXT
-                                       )
-from sqlalchemy import (UniqueConstraint,
-                        ForeignKeyConstraint,
-                        CheckConstraint,
-                        MetaData,
-                        PrimaryKeyConstraint,
-                        func,
-                        create_engine,
-                        inspect)
+from sqlalchemy.dialects.mysql import (
+    TINYINT as mysql_TINYINT,
+    SMALLINT as mysql_SMALLINT,
+    MEDIUMINT as mysql_MEDIUMINT,
+    INTEGER as mysql_INTEGER,
+    BIGINT as mysql_BIGINT,
+    LONGTEXT as mysql_LONGTEXT,
+)
+from sqlalchemy import (
+    UniqueConstraint,
+    ForeignKeyConstraint,
+    CheckConstraint,
+    MetaData,
+    PrimaryKeyConstraint,
+    func,
+    create_engine,
+    inspect,
+)
 from multiprocessing import cpu_count
 import concurrent.futures as cf
 import logging
@@ -28,17 +31,16 @@ import logging
 
 # -----------------------------------------------------------------------------
 
-logger = logging.getLogger('db_migrator')
+logger = logging.getLogger("db_migrator")
 logger.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
-fh = logging.FileHandler('db_migrator.log')
+fh = logging.FileHandler("db_migrator.log")
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
 ch.setLevel(logging.ERROR)
 # create formatter and add it to the handlers
-formatter = logging.Formatter(
-    '%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 fh.setFormatter(formatter)
 # add the handlers to logger
@@ -52,10 +54,10 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     """
     Fills existing table in dest with origin table data.
     """
-    logger.info('Migrating {} table'.format(table_name))
+    logger.info(f"Migrating {table_name} table")
     o_engine = create_engine(o_engine_conn)
     # sqlalchemy wrongly shortens oracle col names if
-    # len(col_name) > 30 - 6. 
+    # len(col_name) > 30 - 6.
     # It should only do only if col_name > 30
     o_engine.dialect.max_identifier_length = 36
     o_metadata = MetaData()
@@ -79,8 +81,8 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         # Nothing to do here
         if count == d_count:
             logger.info(
-                '{} table exists in dest and has same counts than origin table. Skipping.'
-                .format(table_name))
+                f"{table_name} table exists in dest and has same counts than origin table. Skipping."
+            )
             return True
         elif count != d_count and d_count != 0:
             q = select([d_table]).order_by(dpk.desc()).limit(1)
@@ -88,8 +90,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             next_id = res.fetchone().__getitem__(dpk.name)
             first_it = False
     except:
-        logger.error(
-            'Need to create {} table before filling it'.format(table_name))
+        logger.error(f"Need to create {table_name} table before filling it")
 
     # table has a composite pk (usualy a bad design choice).
     # Uses offset and limit to copy data from origin to dest,
@@ -99,7 +100,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             offset = d_count
         else:
             offset = 0
-        for ini in [x for x in range(offset, count-offset, chunk_size)]:
+        for ini in [x for x in range(offset, count - offset, chunk_size)]:
             # use offset and limit, terrible performance.
             q = select([table]).order_by(*pks).offset(ini).limit(chunk_size)
             res = o_engine.execute(q)
@@ -107,10 +108,14 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             d_engine.execute(
                 table.insert(),
                 [
-                    dict([(col_name, col_value)
-                          for col_name, col_value in zip(res.keys(), row)])
+                    dict(
+                        [
+                            (col_name, col_value)
+                            for col_name, col_value in zip(res.keys(), row)
+                        ]
+                    )
                     for row in data
-                ]
+                ],
             )
     else:
         # table has a single pk field. Sorting by pk and paginating.
@@ -127,14 +132,18 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
                 d_engine.execute(
                     table.insert(),
                     [
-                        dict([(col_name, col_value)
-                              for col_name, col_value in zip(res.keys(), row)])
+                        dict(
+                            [
+                                (col_name, col_value)
+                                for col_name, col_value in zip(res.keys(), row)
+                            ]
+                        )
                         for row in data
-                    ]
+                    ],
                 )
             else:
                 break
-    logger.info('{} table filled'.format(table_name))
+    logger.info("{table_name} table filled")
     return True
 
 
@@ -155,6 +164,7 @@ class DbMigrator(object):
         copy_indexes: Copies indexes to dest.
         migrate: Migrates origin to dest.
     """
+
     o_engine_conn = None
     d_engine_conn = None
     n_cores = None
@@ -182,9 +192,11 @@ class DbMigrator(object):
         """
         cls = col.type.__class__
         for supercls in cls.__mro__:
-            if hasattr(supercls, '__visit_name__'):
+            if hasattr(supercls, "__visit_name__"):
                 cls = supercls
-            if supercls.__name__ != supercls.__name__.upper() and not supercls.__name__.startswith('_'):
+            if supercls.__name__ != supercls.__name__.upper() and not supercls.__name__.startswith(
+                "_"
+            ):
                 break
         col.type = col.type.adapt(cls)
 
@@ -194,7 +206,7 @@ class DbMigrator(object):
         # refine types
         if isinstance(col.type, Numeric):
             if col.type.scale == 0:
-                if db_engine == 'mysql':
+                if db_engine == "mysql":
                     if col.type.precision == 1:
                         col.type = mysql_TINYINT()
                     elif col.type.precision == 2:
@@ -205,7 +217,7 @@ class DbMigrator(object):
                         col.type = mysql_INTEGER()
                     else:
                         col.type = mysql_BIGINT()
-                elif db_engine in ['postgresql', 'sqlite']:
+                elif db_engine in ["postgresql", "sqlite"]:
                     if not col.type.precision or col.type.precision > 4:
                         col.type = col.type.adapt(BigInteger)
                     else:
@@ -214,12 +226,12 @@ class DbMigrator(object):
                         elif 2 < col.type.precision <= 4:
                             col.type = col.type.adapt(Integer)
             else:
-                if db_engine == 'mysql':
+                if db_engine == "mysql":
                     if not col.type.precision and not col.type.scale:
-                        col.type.precision = 64 # max mysql precision
-                        col.type.scale = 30 # max mysql scale
+                        col.type.precision = 64  # max mysql precision
+                        col.type.scale = 30  # max mysql scale
         elif isinstance(col.type, Text):
-            if db_engine == 'mysql':
+            if db_engine == "mysql":
                 col.type = col.type.adapt(mysql_LONGTEXT)
         return col
 
@@ -242,19 +254,28 @@ class DbMigrator(object):
             # Only 1 simultaneous process can write to it.
             # Keep only PKs for PostreSQL and MySQL.
             # Restoring them after all data is copied.
-            keep_constraints = list(filter(lambda cons: isinstance(
-                cons, PrimaryKeyConstraint), table.constraints))
-            if d_engine.name == 'sqlite':
+            keep_constraints = list(
+                filter(
+                    lambda cons: isinstance(cons, PrimaryKeyConstraint),
+                    table.constraints,
+                )
+            )
+            if d_engine.name == "sqlite":
                 uks = insp.get_unique_constraints(table_name)
                 for uk in uks:
                     uk_cols = filter(
-                        lambda c: c.name in uk['column_names'], table._columns)
-                    keep_constraints.append(
-                        UniqueConstraint(*uk_cols, name=uk['name']))
-                for fk in filter(lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints):
+                        lambda c: c.name in uk["column_names"], table._columns
+                    )
+                    keep_constraints.append(UniqueConstraint(*uk_cols, name=uk["name"]))
+                for fk in filter(
+                    lambda cons: isinstance(cons, ForeignKeyConstraint),
+                    table.constraints,
+                ):
                     keep_constraints.append(fk)
-                for cc in filter(lambda cons: isinstance(cons, CheckConstraint), table.constraints):
-                    cc.sqltext = TextClause(str(cc.sqltext).replace("\"", ""))
+                for cc in filter(
+                    lambda cons: isinstance(cons, CheckConstraint), table.constraints
+                ):
+                    cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
                     keep_constraints.append(cc)
                 table.constraints = set(keep_constraints)
             else:
@@ -287,10 +308,8 @@ class DbMigrator(object):
         d_metadata = MetaData()
         d_metadata.reflect(d_engine)
 
-        o_tables = filter(
-            lambda x: x[0] not in self.exclude, o_metadata.tables.items())
-        d_tables = filter(
-            lambda x: x[0] not in self.exclude, d_metadata.tables.items())
+        o_tables = filter(lambda x: x[0] not in self.exclude, o_metadata.tables.items())
+        d_tables = filter(lambda x: x[0] not in self.exclude, d_metadata.tables.items())
         o_tables = {table_name: table for table_name, table in o_tables}
         d_tables = {table_name: table for table_name, table in d_tables}
 
@@ -303,11 +322,13 @@ class DbMigrator(object):
         for table_name, table in o_tables.items():
             migrated_table = d_tables[table_name]
             if o_s.query(table).count() != d_s.query(migrated_table).count():
-                logger.error('Row count failed for table {}, {}, {}'
-                             .format(table_name,
-                                     o_s.query(
-                                         table).count(),
-                                     d_s.query(migrated_table).count()))
+                logger.error(
+                    "Row count failed for table {}, {}, {}".format(
+                        table_name,
+                        o_s.query(table).count(),
+                        d_s.query(migrated_table).count(),
+                    )
+                )
 
                 validated = False
         o_s.close()
@@ -325,28 +346,29 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(
-            lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             constraints_to_keep = []
             # keep unique constraints
             uks = insp.get_unique_constraints(table_name)
             for uk in uks:
-                uk_cols = filter(
-                    lambda c: c.name in uk['column_names'], table._columns)
-                uuk = UniqueConstraint(*uk_cols, name=uk['name'])
+                uk_cols = filter(lambda c: c.name in uk["column_names"], table._columns)
+                uuk = UniqueConstraint(*uk_cols, name=uk["name"])
                 uuk._set_parent(table)
                 constraints_to_keep.append(uuk)
 
             # keep check constraints
-            ccs = filter(lambda cons: isinstance(
-                cons, CheckConstraint), table.constraints)
+            ccs = filter(
+                lambda cons: isinstance(cons, CheckConstraint), table.constraints
+            )
             for cc in ccs:
-                cc.sqltext = TextClause(str(cc.sqltext).replace("\"", ""))
+                cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
                 constraints_to_keep.append(cc)
 
             # keep fks
-            for fk in filter(lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints):
+            for fk in filter(
+                lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints
+            ):
                 constraints_to_keep.append(fk)
 
             # create all constraints
@@ -367,14 +389,14 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(
-            lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
             # UKs are internally implemented as a unique indexes.
             # Do not create index if it exists a UK for that field.
-            indexes_to_keep = filter(lambda index: index.name not in [
-                                     x['name'] for x in uks], table.indexes)
+            indexes_to_keep = filter(
+                lambda index: index.name not in [x["name"] for x in uks], table.indexes
+            )
 
             for index in indexes_to_keep:
                 try:
@@ -382,39 +404,14 @@ class DbMigrator(object):
                 except Exception as e:
                     logger.info(e)
 
-    def __sort_tables(self):
-        """
-        Sort tables by FK dependency. 
-        SQLite cannot ALTER to add constraints 
-        and only supports one concurrent write process.
-        """
-        o_engine = create_engine(self.o_engine_conn)
-        metadata = MetaData()
-        metadata.reflect(o_engine)
-
-        tables = filter(
-            lambda x: x[0] not in self.exclude, metadata.tables.items())
-        tables = [x[1] for x in tables]
-
-        ordered_tables = []
-        # sort tables by fk dependency, required for sqlite
-        while tables:
-            current_table = tables[0]
-
-            all_fk_done = True
-            for fk in filter(lambda x: isinstance(x, ForeignKeyConstraint), current_table.constraints):
-                if fk.referred_table.name not in ordered_tables:
-                    all_fk_done = False
-            if all_fk_done:
-                ordered_tables.append(current_table.name)
-                # delete first element of the list(current table) after data is copied
-                del tables[0]
-            else:
-                # put current table in last position of the list
-                tables.append(tables.pop(0))
-        return ordered_tables
-
-    def migrate(self, copy_schema=True, copy_data=True, copy_constraints=True, copy_indexes=True, chunk_size=1000):
+    def migrate(
+        self,
+        copy_schema=True,
+        copy_data=True,
+        copy_constraints=True,
+        copy_indexes=True,
+        chunk_size=1000,
+    ):
         """
         Copies origin database to dest.
         """
@@ -426,23 +423,40 @@ class DbMigrator(object):
 
         # fill tables in dest
         if copy_data:
-            tables = self.__sort_tables()
+            metadata = MetaData()
+            o_engine = create_engine(self.o_engine_conn)
+            metadata.reflect(o_engine)
+            insp = inspect(o_engine)
+            tables_to_migrate = [table[0] for table in filter(lambda x: x[0] not in self.exclude, metadata.tables.items())]
+            tables = [
+                table[0]
+                for table in insp.get_sorted_table_and_fkc_names()
+                if table[0]
+                in tables_to_migrate
+            ]
             # SQLite accepts concurrent read but not write
-            processes = 1 if d_engine.name == 'sqlite' else self.n_cores
+            processes = 1 if d_engine.name == "sqlite" else self.n_cores
 
             with cf.ProcessPoolExecutor(max_workers=processes) as exe:
-                futures = {exe.submit(fill_table, self.o_engine_conn, self.d_engine_conn, table, chunk_size):
-                           table for table in tables}
+                futures = {
+                    exe.submit(
+                        fill_table,
+                        self.o_engine_conn,
+                        self.d_engine_conn,
+                        table,
+                        chunk_size,
+                    ): table
+                    for table in tables
+                }
 
                 for future in cf.as_completed(futures):
                     table = futures[future]
                     try:
                         res = future.result()
                         if not res:
-                            logger.error(
-                                'Something went wrong when copying table {}: '.format(table))
+                            logger.error(f"Something went wrong when copying table: {table}")
                     except Exception as e:
-                        logger.error('Table {} worker died: '.format(table), e)
+                        logger.error(f"Table {table} worker died: ", e)
 
         # check row counts for each table
         if not copy_data:
@@ -452,17 +466,16 @@ class DbMigrator(object):
 
         # copy constraints and indexes
         if all_migrated:
-            logger.info(
-                'All tables succesfuly migrated')
+            logger.info("All tables succesfuly migrated")
             # do not migrate constraints in sqlite, we initially kept all of them as
             # it does not support alter table ADD CONSTRAINT.
-            if copy_constraints and d_engine.name != 'sqlite':
+            if copy_constraints and d_engine.name != "sqlite":
                 self.copy_constraints()
             if copy_indexes:
                 self.copy_indexes()
-            logger.info(
-                'Migration succesfuly finished')
+            logger.info("Migration succesfuly finished")
         else:
             logger.error(
-                'Table migration did not pass the validation, constraints and indexes not copied across')
+                "Table migration did not pass the validation, constraints and indexes not copied across"
+            )
         return all_migrated
