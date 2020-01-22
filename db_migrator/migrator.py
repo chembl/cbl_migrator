@@ -143,7 +143,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
                 )
             else:
                 break
-    logger.info("{table_name} table filled")
+    logger.info(f"{table_name} table filled")
     return True
 
 
