@@ -26,7 +26,7 @@ class TestCase(unittest.TestCase):
     def test_migration(self):
 
         origin = 'sqlite:///origin.db'
-        dest = 'sqlite:///:memory:'
+        dest = 'sqlite:///dest.db'
 
         migrator = DbMigrator(origin, dest)
 
