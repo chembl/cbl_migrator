@@ -1,11 +1,11 @@
-# DB Migrator
+# CBL Migrator
 
 Small SQLAlchemy based library that migrates Oracle DBs to MySQL, PostgreSQL and SQLite. Used in ChEMBL dumps generation process.
 
 to use it:
 
 ```python
-from db_migrator import DbMigrator
+from cbl_migrator import DbMigrator
 
 origin = 'oracle://{user}:{pass}@{host}:{port}/{sid}?encoding=utf8'
 dest = 'postgresql://{user}:{pass}@{host}:{port}/{dbname}?client_encoding=utf8'
