@@ -1,6 +1,6 @@
 # DB Migrator
 
-Small library that migrates Oracle DBs to MySQL, PostgreSQL and SQLite. Used in ChEMBL dumps generation process.
+Small SQLAlchemy based library that migrates Oracle DBs to MySQL, PostgreSQL and SQLite. Used in ChEMBL dumps generation process.
 
 to use it:
 
@@ -26,6 +26,7 @@ migrator.migrate()
 - It won't migrate any table without a PK. May hang with a table without PK and containing an UK field referenced as FK in another table.
 - It does not try to migrate server default values.
 - It does not set autoincremental fields.
+- It does not try to migrate triggers nor procedures.
 
 ## SQLite
 

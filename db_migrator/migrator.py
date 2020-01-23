@@ -24,28 +24,7 @@ from sqlalchemy import (
 )
 from multiprocessing import cpu_count
 import concurrent.futures as cf
-import logging
-
-
-# -----------------------------------------------------------------------------
-
-logger = logging.getLogger("db_migrator")
-logger.setLevel(logging.DEBUG)
-# create file handler which logs even debug messages
-fh = logging.FileHandler("db_migrator.log")
-fh.setLevel(logging.DEBUG)
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.ERROR)
-# create formatter and add it to the handlers
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-ch.setFormatter(formatter)
-fh.setFormatter(formatter)
-# add the handlers to logger
-logger.addHandler(ch)
-logger.addHandler(fh)
-
-# -----------------------------------------------------------------------------
+from .logs import logger
 
 
 def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
@@ -233,7 +212,7 @@ class DbMigrator(object):
                 col.type = col.type.adapt(mysql_LONGTEXT)
         return col
 
-    def copy_schema(self):
+    def __copy_schema(self):
         """        
         Copies the schema to dest db.
         Copies all constraints in sqlite, only pk in mysql and postgres.
@@ -297,7 +276,7 @@ class DbMigrator(object):
 
     def validate_migration(self):
         """
-        Checks that counts for all tables in origin an dest dbd are equal.
+        Checks that counts for all tables in origin an dest dbs are equal.
         """
         o_engine = create_engine(self.o_engine_conn)
         o_metadata = MetaData()
@@ -328,7 +307,7 @@ class DbMigrator(object):
                         validated = False
         return validated
 
-    def copy_constraints(self):
+    def __copy_constraints(self):
         """
         Migrates constraints, UKs, CCs and FKs.
         """
@@ -371,7 +350,7 @@ class DbMigrator(object):
                 except Exception as e:
                     logger.warning(e)
 
-    def copy_indexes(self):
+    def __copy_indexes(self):
         """
         Creates indexes in dest when possible.
         """
@@ -405,14 +384,22 @@ class DbMigrator(object):
         copy_indexes=True,
         chunk_size=1000,
     ):
-        """
-        Copies origin database to dest.
+        """migrate
+
+        executes the migration.
+
+        Args:
+            copy_schema: Bool. False won't create tables in dest.
+            copy_data: Bool. False to generate empty tables.
+            copy_constraints: Bool. False won't create UKs, FKs nor CKs in dest.
+            copy_indexes: Bool. False won't create indexes in dest.
+            chunk_size: Number of records copied in each chunk.
         """
         d_engine = create_engine(self.d_engine_conn)
 
         # copy tables from origin to dest
         if copy_schema:
-            self.copy_schema()
+            self.__copy_schema()
 
         # fill tables in dest
         if copy_data:
@@ -469,9 +456,9 @@ class DbMigrator(object):
             # do not migrate constraints in sqlite, we initially kept all of them as
             # it does not support alter table ADD CONSTRAINT.
             if copy_constraints and d_engine.name != "sqlite":
-                self.copy_constraints()
+                self.__copy_constraints()
             if copy_indexes:
-                self.copy_indexes()
+                self.__copy_indexes()
             logger.info("Migration succesfuly finished")
         else:
             logger.error(
