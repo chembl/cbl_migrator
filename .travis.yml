@@ -1,22 +1,22 @@
 language: python
 jobs:
   include:
-    - name: osx in python3.6
+    - name: python3.6 on osx 
       os: osx
       python: 3.6
-    - name: linux in python3.6
+    - name: python3.6 on linux
       os: linux
       python: 3.6
-    - name: osx in python3.7
+    - name: python3.7 on osx 
       os: osx
       python: 3.7
-    - name: linux in python3.7
+    - name: python3.7 on linux
       os: linux
       python: 3.7
-    - name: osx in python3.8
+    - name: python3.8 on osx
       os: osx
       python: 3.8
-    - name: linux in python3.8
+    - name: python3.8 on linux
       os: linux
       python: 3.8
 install:
