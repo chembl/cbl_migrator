@@ -50,24 +50,25 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
 
     # Check if the table exists in migrated db, if needs to be completed and set starting pk id
     try:
-        first_it = True
         d_table = d_metadata.tables[table_name]
-        dpk = [c for c in d_table.primary_key.columns][0]
-        count = o_engine.execute(select([func.count(pk)])).fetchone()[0]
-        d_count = d_engine.execute(select([func.count(dpk)])).fetchone()[0]
-        # Nothing to do here
-        if count == d_count:
-            logger.info(
-                f"{table_name} table exists in dest and has same counts than origin table. Skipping."
-            )
-            return True
-        elif count != d_count and d_count != 0:
-            q = select([d_table]).order_by(dpk.desc()).limit(1)
-            res = d_engine.execute(q)
-            next_id = res.fetchone().__getitem__(dpk.name)
-            first_it = False
-    except:
-        logger.error(f"Need to create {table_name} table before filling it")
+    except Exception as e:
+        logger.error(f"Need to create {table_name} table before filling it", e)
+        raise Exception(f"Need to create {table_name} table before filling it")
+    
+    dpk = [c for c in d_table.primary_key.columns][0]
+    count = o_engine.execute(select([func.count(pk)])).scalar()
+    d_count = d_engine.execute(select([func.count(dpk)])).scalar()
+    first_it = True
+    if count == d_count:
+        logger.info(
+            f"{table_name} table exists in dest and has same counts than origin table. Skipping."
+        )
+        return True
+    elif count != d_count and d_count != 0:
+        q = select([d_table]).order_by(dpk.desc()).limit(1)
+        res = d_engine.execute(q)
+        next_id = res.fetchone().__getitem__(dpk.name)
+        first_it = False
 
     # table has a composite pk (usualy a bad design choice).
     # Uses offset and limit to copy data from origin to dest,
@@ -78,7 +79,6 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         else:
             offset = 0
         for ini in [x for x in range(offset, count - offset, chunk_size)]:
-            # use offset and limit, terrible performance.
             q = select([table]).order_by(*pks).offset(ini).limit(chunk_size)
             res = o_engine.execute(q)
             data = res.fetchall()
@@ -303,9 +303,9 @@ class DbMigrator(object):
                 for table_name, table in o_tables.items():
                     migrated_table = d_tables[table_name]
                     o_count = o_s.execute(
-                        select([func.count()]).select_from(table)).fetchone()[0]
+                        select([func.count()]).select_from(table)).scalar()
                     d_count = d_s.execute(select([func.count()]).select_from(
-                        migrated_table)).fetchone()[0]
+                        migrated_table)).scalar()
                     if o_count != d_count:
                         logger.error(
                             f"Row count failed for table {table_name}, {o_count}, {d_count}"
@@ -386,7 +386,7 @@ class DbMigrator(object):
                 try:
                     index.create(d_engine)
                 except Exception as e:
-                    logger.info(e)
+                    logger.warning(e)
 
     def migrate(
         self,
