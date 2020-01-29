@@ -298,8 +298,8 @@ class DbMigrator(object):
             with d_engine.begin() as d_s:
                 for table_name, table in o_tables.items():
                     migrated_table = d_tables[table_name]
-                    o_count = o_s.execute(func.count(table)).first()
-                    d_count = d_s.execute(func.count(migrated_table)).first()
+                    o_count = o_s.execute(select([func.count()]).select_from(table)).fetchone()[0]
+                    d_count = d_s.execute(select([func.count()]).select_from(migrated_table)).fetchone()[0]
                     if o_count != d_count:
                         logger.error(
                             f"Row count failed for table {table_name}, {o_count}, {d_count}"
