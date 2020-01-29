@@ -262,16 +262,13 @@ class DbMigrator(object):
 
             table.indexes = set()
 
-            # TODO: Hacky. Fails when reflecting column/table comments so removing it.
             new_metadata_cols = ColumnCollection()
             for col in table._columns:
-                col.comment = None
                 col = self.__fix_column_type(col, d_engine.name)
                 # be sure that no column has auto-increment
                 col.autoincrement = False
                 new_metadata_cols.add(col)
             table.columns = new_metadata_cols.as_immutable()
-            table.comment = None
             new_metadata_tables[table_name] = table
         metadata.tables = immutabledict(new_metadata_tables)
         metadata.create_all(d_engine)
