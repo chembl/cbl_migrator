@@ -264,11 +264,14 @@ class DbMigrator(object):
 
             new_metadata_cols = ColumnCollection()
             for col in table._columns:
+                if d_engine.name == "sqlite":
+                    col.comment = None
                 col = self.__fix_column_type(col, d_engine.name)
-                # be sure that no column has auto-increment
                 col.autoincrement = False
                 new_metadata_cols.add(col)
             table.columns = new_metadata_cols.as_immutable()
+            if d_engine.name == "sqlite":
+                table.comment = None
             new_metadata_tables[table_name] = table
         metadata.tables = immutabledict(new_metadata_tables)
         metadata.create_all(d_engine)
