@@ -54,7 +54,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     except Exception as e:
         logger.error(f"Need to create {table_name} table before filling it", e)
         raise Exception(f"Need to create {table_name} table before filling it")
-    
+
     dpk = [c for c in d_table.primary_key.columns][0]
     count = o_engine.execute(select([func.count(pk)])).scalar()
     d_count = d_engine.execute(select([func.count(dpk)])).scalar()
