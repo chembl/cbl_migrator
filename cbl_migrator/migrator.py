@@ -54,7 +54,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     except Exception as e:
         logger.error(f"Need to create {table_name} table before filling it", e)
         raise Exception(f"Need to create {table_name} table before filling it")
-    
+
     dpk = [c for c in d_table.primary_key.columns][0]
     count = o_engine.execute(select([func.count(pk)])).scalar()
     d_count = d_engine.execute(select([func.count(dpk)])).scalar()
@@ -67,7 +67,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     elif count != d_count and d_count != 0:
         q = select([d_table]).order_by(dpk.desc()).limit(1)
         res = d_engine.execute(q)
-        next_id = res.fetchone().__getitem__(dpk.name)
+        last_id = res.fetchone().__getitem__(dpk.name)
         first_it = False
 
     # table has a composite pk (usualy a bad design choice).
@@ -99,13 +99,13 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         while True:
             q = select([table]).order_by(pk).limit(chunk_size)
             if not first_it:
-                q = q.where(pk > next_id)
+                q = q.where(pk > last_id)
             else:
                 first_it = False
             res = o_engine.execute(q)
             data = res.fetchall()
             if len(data):
-                next_id = data[-1].__getitem__(pk.name)
+                last_id = data[-1].__getitem__(pk.name)
                 d_engine.execute(
                     table.insert(),
                     [
@@ -262,16 +262,12 @@ class DbMigrator(object):
 
             table.indexes = set()
 
-            # TODO: Hacky. Fails when reflecting column/table comments so removing it.
             new_metadata_cols = ColumnCollection()
             for col in table._columns:
-                col.comment = None
                 col = self.__fix_column_type(col, d_engine.name)
-                # be sure that no column has auto-increment
                 col.autoincrement = False
                 new_metadata_cols.add(col)
             table.columns = new_metadata_cols.as_immutable()
-            table.comment = None
             new_metadata_tables[table_name] = table
         metadata.tables = immutabledict(new_metadata_tables)
         metadata.create_all(d_engine)

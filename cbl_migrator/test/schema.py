@@ -5,10 +5,12 @@ from sqlalchemy.types import String, Integer, Float, Text
 Base = declarative_base()
 
 class Compound(Base):
-
+    """
+    Non redundant list of compounds/biotherapeutics with associated identifiers
+    """
     __tablename__ = 'compound'
 
-    cid = Column(Integer, primary_key=True)
+    cid = Column(Integer, primary_key=True, comment="Internal Primary Key for the molecule")
     structure_type = Column(Integer, CheckConstraint("structure_type in ('NONE','MOL','SEQ','BOTH')"))
     compound_name = Column(String(255), index=True)
 
