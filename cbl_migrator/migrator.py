@@ -67,7 +67,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     elif count != d_count and d_count != 0:
         q = select([d_table]).order_by(dpk.desc()).limit(1)
         res = d_engine.execute(q)
-        next_id = res.fetchone().__getitem__(dpk.name)
+        last_id = res.fetchone().__getitem__(dpk.name)
         first_it = False
 
     # table has a composite pk (usualy a bad design choice).
@@ -99,13 +99,13 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         while True:
             q = select([table]).order_by(pk).limit(chunk_size)
             if not first_it:
-                q = q.where(pk > next_id)
+                q = q.where(pk > last_id)
             else:
                 first_it = False
             res = o_engine.execute(q)
             data = res.fetchall()
             if len(data):
-                next_id = data[-1].__getitem__(pk.name)
+                last_id = data[-1].__getitem__(pk.name)
                 d_engine.execute(
                     table.insert(),
                     [
