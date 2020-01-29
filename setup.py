@@ -12,7 +12,7 @@ if __name__ == '__main__':
         packages=['cbl_migrator'],
         long_description=open('README.md', encoding='utf-8').read(),
         long_description_content_type='text/markdown',
-        install_requires=['SQLAlchemy>=1.2'],
+        install_requires=['SQLAlchemy>=1.3'],
         tests_require=['exrex'],
         classifiers=['Development Status :: 2 - Pre-Alpha',
                      'Intended Audience :: Developers',
