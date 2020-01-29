@@ -243,14 +243,16 @@ class DbMigrator(object):
                     uk_cols = filter(
                         lambda c: c.name in uk["column_names"], table._columns
                     )
-                    keep_constraints.append(UniqueConstraint(*uk_cols, name=uk["name"]))
+                    keep_constraints.append(
+                        UniqueConstraint(*uk_cols, name=uk["name"]))
                 for fk in filter(
                     lambda cons: isinstance(cons, ForeignKeyConstraint),
                     table.constraints,
                 ):
                     keep_constraints.append(fk)
                 for cc in filter(
-                    lambda cons: isinstance(cons, CheckConstraint), table.constraints
+                    lambda cons: isinstance(
+                        cons, CheckConstraint), table.constraints
                 ):
                     cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
                     keep_constraints.append(cc)
@@ -285,8 +287,10 @@ class DbMigrator(object):
         d_metadata = MetaData()
         d_metadata.reflect(d_engine)
 
-        o_tables = filter(lambda x: x[0] not in self.exclude, o_metadata.tables.items())
-        d_tables = filter(lambda x: x[0] not in self.exclude, d_metadata.tables.items())
+        o_tables = filter(
+            lambda x: x[0] not in self.exclude, o_metadata.tables.items())
+        d_tables = filter(
+            lambda x: x[0] not in self.exclude, d_metadata.tables.items())
         o_tables = {table_name: table for table_name, table in o_tables}
         d_tables = {table_name: table for table_name, table in d_tables}
 
@@ -298,8 +302,10 @@ class DbMigrator(object):
             with d_engine.begin() as d_s:
                 for table_name, table in o_tables.items():
                     migrated_table = d_tables[table_name]
-                    o_count = o_s.execute(select([func.count()]).select_from(table)).fetchone()[0]
-                    d_count = d_s.execute(select([func.count()]).select_from(migrated_table)).fetchone()[0]
+                    o_count = o_s.execute(
+                        select([func.count()]).select_from(table)).fetchone()[0]
+                    d_count = d_s.execute(select([func.count()]).select_from(
+                        migrated_table)).fetchone()[0]
                     if o_count != d_count:
                         logger.error(
                             f"Row count failed for table {table_name}, {o_count}, {d_count}"
@@ -318,20 +324,23 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             constraints_to_keep = []
             # keep unique constraints
             uks = insp.get_unique_constraints(table_name)
             for uk in uks:
-                uk_cols = filter(lambda c: c.name in uk["column_names"], table._columns)
+                uk_cols = filter(
+                    lambda c: c.name in uk["column_names"], table._columns)
                 uuk = UniqueConstraint(*uk_cols, name=uk["name"])
                 uuk._set_parent(table)
                 constraints_to_keep.append(uuk)
 
             # keep check constraints
             ccs = filter(
-                lambda cons: isinstance(cons, CheckConstraint), table.constraints
+                lambda cons: isinstance(
+                    cons, CheckConstraint), table.constraints
             )
             for cc in ccs:
                 cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
@@ -339,7 +348,8 @@ class DbMigrator(object):
 
             # keep fks
             for fk in filter(
-                lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints
+                lambda cons: isinstance(
+                    cons, ForeignKeyConstraint), table.constraints
             ):
                 constraints_to_keep.append(fk)
 
@@ -361,13 +371,15 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
             # UKs are internally implemented as a unique indexes.
             # Do not create index if it exists a UK for that field.
             indexes_to_keep = filter(
-                lambda index: index.name not in [x["name"] for x in uks], table.indexes
+                lambda index: index.name not in [
+                    x["name"] for x in uks], table.indexes
             )
 
             for index in indexes_to_keep:
