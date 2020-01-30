@@ -82,18 +82,19 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             q = select([table]).order_by(*pks).offset(ini).limit(chunk_size)
             res = o_engine.execute(q)
             data = res.fetchall()
-            d_engine.execute(
-                table.insert(),
-                [
-                    dict(
-                        [
-                            (col_name, col_value)
-                            for col_name, col_value in zip(res.keys(), row)
-                        ]
-                    )
-                    for row in data
-                ],
-            )
+            with d_engine.begin() as conn:
+                conn.execute(
+                    table.insert(),
+                    [
+                        dict(
+                            [
+                                (col_name, col_value)
+                                for col_name, col_value in zip(res.keys(), row)
+                            ]
+                        )
+                        for row in data
+                    ],
+                )
     else:
         # table has a single pk field. Sorting by pk and paginating.
         while True:
@@ -106,18 +107,19 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             data = res.fetchall()
             if len(data):
                 last_id = data[-1].__getitem__(pk.name)
-                d_engine.execute(
-                    table.insert(),
-                    [
-                        dict(
-                            [
-                                (col_name, col_value)
-                                for col_name, col_value in zip(res.keys(), row)
-                            ]
-                        )
-                        for row in data
-                    ],
-                )
+                with d_engine.begin() as conn:
+                    conn.execute(
+                        table.insert(),
+                        [
+                            dict(
+                                [
+                                    (col_name, col_value)
+                                    for col_name, col_value in zip(res.keys(), row)
+                                ]
+                            )
+                            for row in data
+                        ],
+                    )
             else:
                 break
     logger.info(f"{table_name} table filled")
