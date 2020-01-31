@@ -4,10 +4,10 @@ from multiprocessing import cpu_count
 import sys
 
 
-def run(origin, dest, n_workers, copy_schema, copy_data, copy_constraints, copy_indexes):
+def run(origin, dest, n_workers, copy_schema, copy_data, copy_constraints, copy_indexes, chunk_size):
     migrator = DbMigrator(origin, dest, n_workers=n_workers)
     migrator.migrate(copy_schema=copy_schema, copy_data=copy_data,
-                     copy_constraints=copy_constraints, copy_indexes=copy_indexes)
+                     copy_constraints=copy_constraints, copy_indexes=copy_indexes, chunk_size=chunk_size)
     print('Migration finished')
 
 

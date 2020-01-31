@@ -14,6 +14,11 @@ migrator = DbMigrator(origin, dest, ['excluded_table1', 'excluded_table2'])
 migrator.migrate()
 ```
 
+as a command line command:
+```bash
+cbl-migrator oracle://{user}:{pass}@{host}:{port}/{sid}?encoding=utf8 postgresql://{user}:{pass}@{host}:{port}/{dbname}?client_encoding=utf8 --n_workers 4 
+```
+
 ## What it does (in order of events)
 
 - Copies tables from origin to dest using the closest data type for each field. No constraints except PKs are initially copied across.
