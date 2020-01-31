@@ -8,7 +8,7 @@ def run(origin, dest, n_workers, copy_schema, copy_data, copy_constraints, copy_
     migrator = DbMigrator(origin, dest, n_workers=n_workers)
     migrator.migrate(copy_schema=copy_schema, copy_data=copy_data,
                      copy_constraints=copy_constraints, copy_indexes=copy_indexes, chunk_size=chunk_size)
-    print('Migration finished')
+    print('Migration finished, check cbl_migrator.log file for extra information')
 
 
 def main(args=None):
