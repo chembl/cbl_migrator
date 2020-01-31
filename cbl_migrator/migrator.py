@@ -33,10 +33,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     """
     logger.info(f"Migrating {table_name} table")
     o_engine = create_engine(o_engine_conn)
-    # sqlalchemy wrongly shortens oracle col names if
-    # len(col_name) > 30 - 6.
-    # It should only do only if col_name > 30
-    o_engine.dialect.max_identifier_length = 36
+    o_engine.dialect.max_identifier_length = 128
     o_metadata = MetaData()
     o_metadata.reflect(o_engine)
     d_engine = create_engine(d_engine_conn)
