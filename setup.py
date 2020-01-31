@@ -14,6 +14,9 @@ if __name__ == '__main__':
         long_description_content_type='text/markdown',
         install_requires=['SQLAlchemy>=1.3'],
         tests_require=['exrex'],
+        entry_points = {
+            'console_scripts': ['cbl-migrator=cbl_migrator.bin.run_migrator:main'],
+        },
         classifiers=['Development Status :: 2 - Pre-Alpha',
                      'Intended Audience :: Developers',
                      'License :: OSI Approved :: MIT License',
