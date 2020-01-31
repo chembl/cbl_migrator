@@ -9,7 +9,7 @@ if __name__ == '__main__':
         description='Migrates Oracle dbs to PostgreSQL, MySQL and Sqlite',
         url='https://github.com/chembl/cbl_migrator',
         license='MIT',
-        packages=['cbl_migrator'],
+        packages=['cbl_migrator', 'cbl_migrator.bin'],
         long_description=open('README.md', encoding='utf-8').read(),
         long_description_content_type='text/markdown',
         install_requires=['SQLAlchemy>=1.3'],

@@ -33,19 +33,19 @@ def main(args=None):
                         default=True)
 
     parser.add_argument('--copy_data',
-                        help='Copy data,
+                        help='Copy data',
                         default=True)
 
     parser.add_argument('--copy_constraints',
-                        help='Copy constraints,
+                        help='Copy constraints',
                         default=True)
 
     parser.add_argument('--copy_indexes',
-                        help='Copy indexes,
+                        help='Copy indexes',
                         default=True)
 
     parser.add_argument('--chunk_size',
-                        help='Number of rows copied at the same time,
+                        help='Number of rows copied at the same time',
                         default=1000)
 
     args = parser.parse_args()
