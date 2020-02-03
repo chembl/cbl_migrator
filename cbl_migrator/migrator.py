@@ -32,13 +32,21 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     Fills existing table in dest with origin table data.
     """
     logger.info(f"Migrating {table_name} table")
-    o_engine = create_engine(o_engine_conn)
-    o_engine.dialect.max_identifier_length = 128
-    o_metadata = MetaData()
-    o_metadata.reflect(o_engine)
     d_engine = create_engine(d_engine_conn)
     d_metadata = MetaData()
     d_metadata.reflect(d_engine)
+
+    o_engine = create_engine(o_engine_conn)
+    # use same d_engine max_identifier_length
+    # when running select query to fetch data from origin it should generate
+    # same table/column names as when the table was created
+    if d_engine.name == "mysql":
+        # https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/mysql/base.py#L2164
+        o_engine.dialect.max_identifier_length = d_engine.dialect.max_index_name_length
+    elif d_engine.name in ["sqlite", "postgresql"]:
+        o_engine.dialect.max_identifier_length = d_engine.dialect.max_identifier_length
+    o_metadata = MetaData()
+    o_metadata.reflect(o_engine)
 
     table = o_metadata.tables[table_name]
     pks = [c for c in table.primary_key.columns]
@@ -150,8 +158,9 @@ class DbMigrator(object):
         self.d_engine_conn = d_conn_string
         self.n_cores = n_workers
 
-        # exclude tables with no pk
         o_engine = create_engine(self.o_engine_conn)
+        if o_engine.name != "oracle":
+            logger.warning(f"origin DB should be an Oracle")
         metadata = MetaData()
         metadata.reflect(o_engine)
         no_pk = []
@@ -159,6 +168,7 @@ class DbMigrator(object):
             pks = [c for c in table.primary_key.columns]
             if not pks:
                 no_pk.append(table_name)
+        # exclude tables with no pk
         self.exclude = exclude + no_pk
 
     def __fix_column_type(self, col, db_engine):
@@ -223,9 +233,9 @@ class DbMigrator(object):
         insp = inspect(o_engine)
 
         new_metadata_tables = {}
-        for table_name, table in metadata.tables.items():
-            if table_name in self.exclude:
-                continue
+        tables = filter(
+            lambda x: x[0] not in self.exclude, metadata.tables.items())
+        for table_name, table in tables:
             # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT.
             # Only 1 simultaneous process can write to it.
             # Keep only PKs for PostreSQL and MySQL.
