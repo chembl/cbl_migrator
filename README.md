@@ -1,3 +1,9 @@
+[![Build Status](https://travis-ci.org/chembl/cbl_migrator.svg?branch=master)](https://travis-ci.org/chembl/cbl_migrator)
+[![Latest Version](https://img.shields.io/pypi/v/cbl_migrator.svg)](https://pypi.python.org/pypi/cbl_migrator/)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/cbl_migrator.svg)](https://pypi.python.org/pypi/cbl_migrator/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 # CBL Migrator
 
 Small SQLAlchemy based library that migrates Oracle DBs to MySQL, PostgreSQL and SQLite. Used in ChEMBL dumps generation process.
