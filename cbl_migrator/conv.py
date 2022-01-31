@@ -66,5 +66,9 @@ def sqlite2ora(col):
     return col
 
 
+def sqlite2sqlite(col):
+    return col
+
+
 CONV["oracle"] = {"mysql": ora2mysql, "postgresql": ora2pg, "sqlite": ora2sqlite}
-CONV["sqlite"] = {"oracle": sqlite2ora}
+CONV["sqlite"] = {"oracle": sqlite2ora, "sqlite": sqlite2sqlite}
