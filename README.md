@@ -23,7 +23,7 @@ migrator.migrate()
 
 directly from the command line:
 ```bash
-cbl-migrator oracle://{user}:{pass}@{host}:{port}/{sid}?encoding=utf8 postgresql://{user}:{pass}@{host}:{port}/{dbname}?client_encoding=utf8 --n_workers 4 
+cbl-migrator "oracle://{user}:{pass}@{host}:{port}/?service_name={service_name}?encoding=utf8" "postgresql://{user}:{pass}@{host}:{port}/{dbname}?client_encoding=utf8" --n_workers 8
 ```
 
 ## What it does (in order of events)

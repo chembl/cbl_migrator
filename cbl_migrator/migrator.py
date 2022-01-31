@@ -1,5 +1,5 @@
-from sqlalchemy.sql.base import ColumnCollection
 from sqlalchemy.util._collections import immutabledict
+from sqlalchemy.sql.base import ColumnCollection
 from sqlalchemy.sql.elements import TextClause
 from sqlalchemy.schema import AddConstraint
 from sqlalchemy.sql import select
@@ -14,6 +14,7 @@ from sqlalchemy import (
     inspect,
 )
 import concurrent.futures as cf
+import os
 from .conv import CONV
 from .logs import logger
 
@@ -28,14 +29,15 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     d_metadata.reflect(d_engine)
 
     o_engine = create_engine(o_engine_conn)
-    # use same d_engine max_identifier_length
-    # when running select query to fetch data from origin it should generate
-    # same table/column names as when the table was created
     if d_engine.name == "mysql":
-        # https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/mysql/base.py#L2164
-        o_engine.dialect.max_identifier_length = d_engine.dialect.max_index_name_length
-    elif d_engine.name in ["sqlite", "postgresql"]:
+        # https://github.com/sqlalchemy/sqlalchemy/blob/ed78e679eafe787f4c152b78726bf1e1b91ab465/lib/sqlalchemy/dialects/mysql/base.py#L2332
+        o_engine.dialect.max_identifier_length = 64
+    if o_engine.dialect.max_identifier_length > d_engine.dialect.max_identifier_length:
         o_engine.dialect.max_identifier_length = d_engine.dialect.max_identifier_length
+        logger.info(
+            f"{o_engine.name} max_identifier_length larger than {d_engine.name}."
+        )
+
     o_metadata = MetaData()
     o_metadata.reflect(o_engine)
 
@@ -52,8 +54,8 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         raise Exception(f"Need to create {table_name} table before filling it")
 
     dpk = [c for c in d_table.primary_key.columns][0]
-    count = o_engine.execute(select([func.count(pk)])).scalar()
-    d_count = d_engine.execute(select([func.count(dpk)])).scalar()
+    count = o_engine.execute(select(func.count(pk))).scalar()
+    d_count = d_engine.execute(select(func.count(dpk))).scalar()
     first_it = True
     if count == d_count:
         logger.info(
@@ -61,7 +63,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         )
         return True
     elif count != d_count and d_count != 0:
-        q = select([d_table]).order_by(dpk.desc()).limit(1)
+        q = select(d_table).order_by(dpk.desc()).limit(1)
         res = d_engine.execute(q)
         last_id = res.fetchone().__getitem__(dpk.name)
         first_it = False
@@ -75,7 +77,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         else:
             offset = 0
         for ini in [x for x in range(offset, count - offset, chunk_size)]:
-            q = select([table]).order_by(*pks).offset(ini).limit(chunk_size)
+            q = select(table).order_by(*pks).offset(ini).limit(chunk_size)
             res = o_engine.execute(q)
             data = res.fetchall()
             with d_engine.begin() as conn:
@@ -94,7 +96,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     else:
         # table has a single pk field. Sorting by pk and paginating.
         while True:
-            q = select([table]).order_by(pk).limit(chunk_size)
+            q = select(table).order_by(pk).limit(chunk_size)
             if not first_it:
                 q = q.where(pk > last_id)
             else:
@@ -177,7 +179,7 @@ class DbMigrator:
         if o_engine in CONV and d_engine in CONV[o_engine]:
             col = CONV[o_engine][d_engine](col)
         else:
-            raise Exception(f"Migration from {o_engine} to {d_engine} not available")            
+            raise Exception(f"Migration from {o_engine} to {d_engine} not available")
         return col
 
     def __copy_schema(self):
@@ -257,15 +259,15 @@ class DbMigrator:
             return False
 
         validated = True
-        with o_engine.begin() as o_s:
-            with d_engine.begin() as d_s:
+        with o_engine.connect() as o_s:
+            with d_engine.connect() as d_s:
                 for table_name, table in o_tables.items():
                     migrated_table = d_tables[table_name]
                     o_count = o_s.execute(
-                        select([func.count()]).select_from(table)
+                        select(func.count()).select_from(table)
                     ).scalar()
                     d_count = d_s.execute(
-                        select([func.count()]).select_from(migrated_table)
+                        select(func.count()).select_from(migrated_table)
                     ).scalar()
                     if o_count != d_count:
                         logger.error(
@@ -362,7 +364,13 @@ class DbMigrator:
             copy_indexes: Bool. False won't create indexes in dest.
             chunk_size: Number of records copied in each chunk.
         """
+        o_engine = create_engine(self.o_engine_conn)
         d_engine = create_engine(self.d_engine_conn)
+
+        if o_engine.name == "sqlite":
+            sqlite_db_path = o_engine.url.database
+            if not sqlite_db_path or (not os.path.isfile(sqlite_db_path) or os.path.getsize(sqlite_db_path) < 100):
+                raise Exception("Origin SQLite database doesn't exist or is too small")
 
         # copy tables from origin to dest
         if copy_schema:
@@ -371,7 +379,6 @@ class DbMigrator:
         # fill tables in dest
         if copy_data:
             metadata = MetaData()
-            o_engine = create_engine(self.o_engine_conn)
             metadata.reflect(o_engine)
             insp = inspect(o_engine)
             tables_to_migrate = [
@@ -385,9 +392,9 @@ class DbMigrator:
                 for table in insp.get_sorted_table_and_fkc_names()
                 if table[0] in tables_to_migrate
             ]
+
             # SQLite accepts concurrent read but not write
             processes = 1 if d_engine.name == "sqlite" else self.n_cores
-
             with cf.ProcessPoolExecutor(max_workers=processes) as exe:
                 futures = {
                     exe.submit(
