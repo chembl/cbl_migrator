@@ -374,6 +374,7 @@ class DbMigrator:
 
         # copy tables from origin to dest
         if copy_schema:
+            logger.info("Copying schema")
             self.__copy_schema()
 
         # fill tables in dest
@@ -430,10 +431,14 @@ class DbMigrator:
             # do not migrate constraints in sqlite, we initially kept all of them as
             # it does not support alter table ADD CONSTRAINT.
             if copy_constraints and d_engine.name != "sqlite":
+                logger.info("Copying constraints")
                 self.__copy_constraints()
+                logger.info("Constraints created")
             if copy_indexes:
+                logger.info("Copying indexes")
                 self.__copy_indexes()
-            logger.info("Migration succesfuly finished")
+                logger.info("Indexes created")
+            logger.info("Migration completed")
         else:
             logger.error(
                 "Table migration did not pass the validation, constraints and indexes not copied across"
