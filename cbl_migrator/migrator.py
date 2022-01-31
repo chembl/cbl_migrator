@@ -34,9 +34,6 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         o_engine.dialect.max_identifier_length = 64
     if o_engine.dialect.max_identifier_length > d_engine.dialect.max_identifier_length:
         o_engine.dialect.max_identifier_length = d_engine.dialect.max_identifier_length
-        logger.info(
-            f"{o_engine.name} max_identifier_length larger than {d_engine.name}."
-        )
 
     o_metadata = MetaData()
     o_metadata.reflect(o_engine)
@@ -366,6 +363,9 @@ class DbMigrator:
         """
         o_engine = create_engine(self.o_engine_conn)
         d_engine = create_engine(self.d_engine_conn)
+
+        if o_engine.dialect.max_identifier_length > d_engine.dialect.max_identifier_length:
+            logger.info(f"{o_engine.name} max_identifier_length larger than {d_engine.name}.")
 
         if o_engine.name == "sqlite":
             sqlite_db_path = o_engine.url.database
