@@ -3,15 +3,6 @@ from sqlalchemy.util._collections import immutabledict
 from sqlalchemy.sql.elements import TextClause
 from sqlalchemy.schema import AddConstraint
 from sqlalchemy.sql import select
-from sqlalchemy.types import Numeric, Text, BigInteger, SmallInteger, Integer, DateTime
-from sqlalchemy.dialects.mysql import (
-    TINYINT as mysql_TINYINT,
-    SMALLINT as mysql_SMALLINT,
-    MEDIUMINT as mysql_MEDIUMINT,
-    INTEGER as mysql_INTEGER,
-    BIGINT as mysql_BIGINT,
-    LONGTEXT as mysql_LONGTEXT,
-)
 from sqlalchemy import (
     UniqueConstraint,
     ForeignKeyConstraint,
@@ -22,8 +13,8 @@ from sqlalchemy import (
     create_engine,
     inspect,
 )
-from multiprocessing import cpu_count
 import concurrent.futures as cf
+from .conv import CONV
 from .logs import logger
 
 
@@ -131,7 +122,7 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
     return True
 
 
-class DbMigrator(object):
+class DbMigrator:
     """Migrator class.
 
     Migrates origin db to dest one.
@@ -149,18 +140,12 @@ class DbMigrator(object):
         migrate: Migrates origin to dest.
     """
 
-    o_engine_conn = None
-    d_engine_conn = None
-    n_cores = None
-
-    def __init__(self, o_conn_string, d_conn_string, exclude=[], n_workers=cpu_count()):
+    def __init__(self, o_conn_string, d_conn_string, exclude=[], n_workers=4):
         self.o_engine_conn = o_conn_string
         self.d_engine_conn = d_conn_string
         self.n_cores = n_workers
 
         o_engine = create_engine(self.o_engine_conn)
-        if o_engine.name != "oracle":
-            logger.warning(f"origin DB should be an Oracle")
         metadata = MetaData()
         metadata.reflect(o_engine)
         no_pk = []
@@ -171,7 +156,7 @@ class DbMigrator(object):
         # exclude tables with no pk
         self.exclude = exclude + no_pk
 
-    def __fix_column_type(self, col, db_engine):
+    def __fix_column_type(self, col, o_engine, d_engine):
         """
         Adapt column types to the most reasonable generic types (ie. VARCHAR -> String)
         Borrowed from sqlacodegen.
@@ -189,36 +174,10 @@ class DbMigrator(object):
         # unset any server default value
         col.server_default = None
 
-        # refine types
-        if isinstance(col.type, Numeric):
-            if col.type.scale == 0:
-                if db_engine == "mysql":
-                    if col.type.precision == 1:
-                        col.type = mysql_TINYINT()
-                    elif col.type.precision == 2:
-                        col.type = mysql_SMALLINT()
-                    elif col.type.precision == 3:
-                        col.type = mysql_MEDIUMINT()
-                    elif col.type.precision == 4:
-                        col.type = mysql_INTEGER()
-                    else:
-                        col.type = mysql_BIGINT()
-                elif db_engine in ["postgresql", "sqlite"]:
-                    if not col.type.precision or col.type.precision > 4:
-                        col.type = col.type.adapt(BigInteger)
-                    else:
-                        if col.type.precision <= 2:
-                            col.type = col.type.adapt(SmallInteger)
-                        elif 2 < col.type.precision <= 4:
-                            col.type = col.type.adapt(Integer)
-            else:
-                if db_engine == "mysql":
-                    if not col.type.precision and not col.type.scale:
-                        col.type.precision = 64  # max mysql precision
-                        col.type.scale = 30  # max mysql scale
-        elif isinstance(col.type, Text):
-            if db_engine == "mysql":
-                col.type = col.type.adapt(mysql_LONGTEXT)
+        if o_engine in CONV and d_engine in CONV[o_engine]:
+            col = CONV[o_engine][d_engine](col)
+        else:
+            raise Exception(f"Migration from {o_engine} to {d_engine} not available")            
         return col
 
     def __copy_schema(self):
@@ -233,8 +192,7 @@ class DbMigrator(object):
         insp = inspect(o_engine)
 
         new_metadata_tables = {}
-        tables = filter(
-            lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             # Keep everything for sqlite. SQLite cant alter table ADD CONSTRAINT.
             # Only 1 simultaneous process can write to it.
@@ -252,16 +210,14 @@ class DbMigrator(object):
                     uk_cols = filter(
                         lambda c: c.name in uk["column_names"], table._columns
                     )
-                    keep_constraints.append(
-                        UniqueConstraint(*uk_cols, name=uk["name"]))
+                    keep_constraints.append(UniqueConstraint(*uk_cols, name=uk["name"]))
                 for fk in filter(
                     lambda cons: isinstance(cons, ForeignKeyConstraint),
                     table.constraints,
                 ):
                     keep_constraints.append(fk)
                 for cc in filter(
-                    lambda cons: isinstance(
-                        cons, CheckConstraint), table.constraints
+                    lambda cons: isinstance(cons, CheckConstraint), table.constraints
                 ):
                     cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
                     keep_constraints.append(cc)
@@ -273,7 +229,7 @@ class DbMigrator(object):
 
             new_metadata_cols = ColumnCollection()
             for col in table._columns:
-                col = self.__fix_column_type(col, d_engine.name)
+                col = self.__fix_column_type(col, o_engine.name, d_engine.name)
                 col.autoincrement = False
                 new_metadata_cols.add(col)
             table.columns = new_metadata_cols.as_immutable()
@@ -292,10 +248,8 @@ class DbMigrator(object):
         d_metadata = MetaData()
         d_metadata.reflect(d_engine)
 
-        o_tables = filter(
-            lambda x: x[0] not in self.exclude, o_metadata.tables.items())
-        d_tables = filter(
-            lambda x: x[0] not in self.exclude, d_metadata.tables.items())
+        o_tables = filter(lambda x: x[0] not in self.exclude, o_metadata.tables.items())
+        d_tables = filter(lambda x: x[0] not in self.exclude, d_metadata.tables.items())
         o_tables = {table_name: table for table_name, table in o_tables}
         d_tables = {table_name: table for table_name, table in d_tables}
 
@@ -308,9 +262,11 @@ class DbMigrator(object):
                 for table_name, table in o_tables.items():
                     migrated_table = d_tables[table_name]
                     o_count = o_s.execute(
-                        select([func.count()]).select_from(table)).scalar()
-                    d_count = d_s.execute(select([func.count()]).select_from(
-                        migrated_table)).scalar()
+                        select([func.count()]).select_from(table)
+                    ).scalar()
+                    d_count = d_s.execute(
+                        select([func.count()]).select_from(migrated_table)
+                    ).scalar()
                     if o_count != d_count:
                         logger.error(
                             f"Row count failed for table {table_name}, {o_count}, {d_count}"
@@ -329,23 +285,20 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(
-            lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             constraints_to_keep = []
             # keep unique constraints
             uks = insp.get_unique_constraints(table_name)
             for uk in uks:
-                uk_cols = filter(
-                    lambda c: c.name in uk["column_names"], table._columns)
+                uk_cols = filter(lambda c: c.name in uk["column_names"], table._columns)
                 uuk = UniqueConstraint(*uk_cols, name=uk["name"])
                 uuk._set_parent(table)
                 constraints_to_keep.append(uuk)
 
             # keep check constraints
             ccs = filter(
-                lambda cons: isinstance(
-                    cons, CheckConstraint), table.constraints
+                lambda cons: isinstance(cons, CheckConstraint), table.constraints
             )
             for cc in ccs:
                 cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
@@ -353,8 +306,7 @@ class DbMigrator(object):
 
             # keep fks
             for fk in filter(
-                lambda cons: isinstance(
-                    cons, ForeignKeyConstraint), table.constraints
+                lambda cons: isinstance(cons, ForeignKeyConstraint), table.constraints
             ):
                 constraints_to_keep.append(fk)
 
@@ -376,15 +328,13 @@ class DbMigrator(object):
 
         insp = inspect(o_engine)
 
-        tables = filter(
-            lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
             # UKs are internally implemented as a unique indexes.
             # Do not create index if it exists a UK for that field.
             indexes_to_keep = filter(
-                lambda index: index.name not in [
-                    x["name"] for x in uks], table.indexes
+                lambda index: index.name not in [x["name"] for x in uks], table.indexes
             )
 
             for index in indexes_to_keep:
@@ -399,7 +349,7 @@ class DbMigrator(object):
         copy_data=True,
         copy_constraints=True,
         copy_indexes=True,
-        chunk_size=1000,
+        chunk_size=10000,
     ):
         """migrate
 

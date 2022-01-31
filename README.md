@@ -13,7 +13,8 @@ to use it, as a Python library:
 ```python
 from cbl_migrator import DbMigrator
 
-origin = 'oracle://{user}:{pass}@{host}:{port}/{sid}?encoding=utf8'
+origin = 'oracle://{user}:{pass}@{host}:{port}/?service_name={service_name}?encoding=utf8'
+#dest = 'mysql://{user}:{pass}@{host}:{port}/{dbname}?use_unicode=1&charset=utf8'
 dest = 'postgresql://{user}:{pass}@{host}:{port}/{dbname}?client_encoding=utf8'
 
 migrator = DbMigrator(origin, dest, ['excluded_table1', 'excluded_table2'], n_workers=4)
