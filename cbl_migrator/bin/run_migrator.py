@@ -1,6 +1,5 @@
-import argparse
 from cbl_migrator import DbMigrator
-from multiprocessing import cpu_count
+import argparse
 import sys
 
 
@@ -8,7 +7,6 @@ def run(origin, dest, n_workers, copy_schema, copy_data, copy_constraints, copy_
     migrator = DbMigrator(origin, dest, n_workers=int(n_workers))
     migrator.migrate(copy_schema=copy_schema, copy_data=copy_data,
                      copy_constraints=copy_constraints, copy_indexes=copy_indexes, chunk_size=int(chunk_size))
-    print('Migration finished, check cbl_migrator.log file for extra information')
 
 
 def main(args=None):
@@ -26,7 +24,7 @@ def main(args=None):
 
     parser.add_argument('--n_workers',
                         help='Number of workers migrating tables in parallel',
-                        default=cpu_count())
+                        default=8)
 
     parser.add_argument('--copy_schema',
                         help='Copy database schema',
