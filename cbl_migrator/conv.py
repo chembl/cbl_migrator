@@ -32,6 +32,7 @@ def ora2mysql(col):
                 col.type.scale = 30  # max mysql scale
     elif isinstance(col.type, Text):
         col.type = col.type.adapt(mysql_LONGTEXT)
+    return col
 
 
 def ora2pg(col):
@@ -43,6 +44,7 @@ def ora2pg(col):
                 col.type = col.type.adapt(SmallInteger)
             elif 2 < col.type.precision <= 4:
                 col.type = col.type.adapt(Integer)
+    return col
 
 
 def ora2sqlite(col):
