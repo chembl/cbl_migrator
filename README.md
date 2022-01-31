@@ -1,4 +1,4 @@
-[![CI Testing](https://github.com/chembl/cbl-migrator/workflows/CI/badge.svg)](https://github.com/chembl/cbl-migrator/actions?query=workflow%3ACI+branch%3Amain)
+[![CI Testing](https://github.com/chembl/cbl-migrator/workflows/CI/badge.svg)](https://github.com/chembl/cbl-migrator/actions?query=workflow%3ACI+branch%3Amaster)
 [![Latest Version](https://img.shields.io/pypi/v/cbl_migrator.svg)](https://pypi.python.org/pypi/cbl_migrator/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/cbl_migrator.svg)](https://pypi.python.org/pypi/cbl_migrator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
