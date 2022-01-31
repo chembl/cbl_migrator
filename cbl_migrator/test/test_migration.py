@@ -1,8 +1,6 @@
-from sqlalchemy import MetaData, create_engine, ForeignKey
-from sqlalchemy import Table, Column
-from sqlalchemy import Integer, String, inspect
-from .. import DbMigrator
+from sqlalchemy import MetaData, create_engine, inspect
 from .schema import Base, Compound, CompoundStructure, CompoundProperties
+from .. import DbMigrator
 import unittest
 import exrex
 import random
