@@ -51,8 +51,10 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         raise Exception(f"Need to create {table_name} table before filling it")
 
     dpk = [c for c in d_table.primary_key.columns][0]
-    count = o_engine.execute(select(func.count(pk))).scalar()
-    d_count = d_engine.execute(select(func.count(dpk))).scalar()
+    with o_engine.connect() as conn:
+        count = conn.execute(select(func.count(pk))).scalar()
+    with d_engine.connect() as conn:
+        d_count = conn.execute(select(func.count(dpk))).scalar()
     first_it = True
     if count == d_count:
         logger.info(
@@ -61,8 +63,9 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
         return True
     elif count != d_count and d_count != 0:
         q = select(d_table).order_by(dpk.desc()).limit(1)
-        res = d_engine.execute(q)
-        last_id = res.fetchone().__getitem__(dpk.name)
+        with d_engine.connect() as conn:
+            res = conn.execute(q)
+            last_id = res.fetchone().__getitem__(dpk.name)
         first_it = False
 
     # table has a composite pk (usualy a bad design choice).
@@ -75,33 +78,9 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
             offset = 0
         for ini in [x for x in range(offset, count - offset, chunk_size)]:
             q = select(table).order_by(*pks).offset(ini).limit(chunk_size)
-            res = o_engine.execute(q)
-            data = res.fetchall()
-            with d_engine.begin() as conn:
-                conn.execute(
-                    table.insert(),
-                    [
-                        dict(
-                            [
-                                (col_name, col_value)
-                                for col_name, col_value in zip(res.keys(), row)
-                            ]
-                        )
-                        for row in data
-                    ],
-                )
-    else:
-        # table has a single pk field. Sorting by pk and paginating.
-        while True:
-            q = select(table).order_by(pk).limit(chunk_size)
-            if not first_it:
-                q = q.where(pk > last_id)
-            else:
-                first_it = False
-            res = o_engine.execute(q)
-            data = res.fetchall()
-            if len(data):
-                last_id = data[-1].__getitem__(pk.name)
+            with o_engine.connect() as connr:
+                res = connr.execute(q)
+                data = res.fetchall()
                 with d_engine.begin() as conn:
                     conn.execute(
                         table.insert(),
@@ -115,8 +94,34 @@ def fill_table(o_engine_conn, d_engine_conn, table_name, chunk_size):
                             for row in data
                         ],
                     )
+    else:
+        # table has a single pk field. Sorting by pk and paginating.
+        while True:
+            q = select(table).order_by(pk).limit(chunk_size)
+            if not first_it:
+                q = q.where(pk > last_id)
             else:
-                break
+                first_it = False
+            with o_engine.connect() as connr:
+                res = connr.execute(q)
+                data = res.fetchall()
+                if len(data):
+                    last_id = data[-1].__getitem__(pk.name)
+                    with d_engine.begin() as conn:
+                        conn.execute(
+                            table.insert(),
+                            [
+                                dict(
+                                    [
+                                        (col_name, col_value)
+                                        for col_name, col_value in zip(res.keys(), row)
+                                    ]
+                                )
+                                for row in data
+                            ],
+                        )
+                else:
+                    break
     logger.info(f"{table_name} table filled")
     return True
 
@@ -312,7 +317,8 @@ class DbMigrator:
             # create all constraints
             for cons in constraints_to_keep:
                 try:
-                    d_engine.execute(AddConstraint(cons))
+                    with d_engine.begin() as conn:
+                        conn.execute(AddConstraint(cons))
                 except Exception as e:
                     logger.warning(e)
 
