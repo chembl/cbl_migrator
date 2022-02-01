@@ -13,6 +13,9 @@ CONV = {}
 
 
 def ora2mysql(col):
+    """
+    Used in ChEMBL dump generation
+    """
     if isinstance(col.type, Numeric):
         if col.type.scale == 0:
             if col.type.precision == 1:
@@ -35,6 +38,9 @@ def ora2mysql(col):
 
 
 def ora2pg(col):
+    """
+    Used in ChEMBL dump generation
+    """
     if isinstance(col.type, Numeric):
         if not col.type.precision or col.type.precision > 4:
             col.type = col.type.adapt(BigInteger)
@@ -47,6 +53,9 @@ def ora2pg(col):
 
 
 def ora2sqlite(col):
+    """
+    Used in ChEMBL dump generation
+    """
     if isinstance(col.type, Numeric):
         if col.type.scale == 0:
             if not col.type.precision or col.type.precision > 4:
