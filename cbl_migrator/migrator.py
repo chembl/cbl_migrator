@@ -376,6 +376,7 @@ class DbMigrator:
         if copy_schema:
             logger.info("Copying schema")
             self.__copy_schema()
+            logger.info("Schema copied")
 
         # fill tables in dest
         if copy_data:
