@@ -348,7 +348,7 @@ class DbMigrator:
         copy_data=True,
         copy_constraints=True,
         copy_indexes=True,
-        chunk_size=10000,
+        chunk_size=1000,
     ):
         """migrate
 
