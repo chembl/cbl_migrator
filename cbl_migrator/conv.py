@@ -7,13 +7,15 @@ from sqlalchemy.dialects.mysql import (
     BIGINT as mysql_BIGINT,
     LONGTEXT as mysql_LONGTEXT,
 )
-from sqlalchemy.dialects.mysql import REAL as sqlite_REAL
 
 
 CONV = {}
 
 
 def ora2mysql(col):
+    """
+    Used in ChEMBL dump generation
+    """
     if isinstance(col.type, Numeric):
         if col.type.scale == 0:
             if col.type.precision == 1:
@@ -36,6 +38,9 @@ def ora2mysql(col):
 
 
 def ora2pg(col):
+    """
+    Used in ChEMBL dump generation
+    """
     if isinstance(col.type, Numeric):
         if not col.type.precision or col.type.precision > 4:
             col.type = col.type.adapt(BigInteger)
@@ -48,6 +53,9 @@ def ora2pg(col):
 
 
 def ora2sqlite(col):
+    """
+    Used in ChEMBL dump generation
+    """
     if isinstance(col.type, Numeric):
         if col.type.scale == 0:
             if not col.type.precision or col.type.precision > 4:
@@ -57,18 +65,38 @@ def ora2sqlite(col):
                     col.type = col.type.adapt(SmallInteger)
                 elif 2 < col.type.precision <= 4:
                     col.type = col.type.adapt(Integer)
-        else:
-            col.type = col.type.adapt(sqlite_REAL)
     return col
 
 
 def sqlite2ora(col):
+    """
+    Not much tested
+    """
     return col
 
 
 def sqlite2sqlite(col):
+    """
+    Used to run the GA simple tests
+    """
+    return col
+
+
+def pg2ora(col):
+    """
+    Not much tested
+    """
+    return col
+
+
+def mysql2ora(col):
+    """
+    Not much tested
+    """
     return col
 
 
 CONV["oracle"] = {"mysql": ora2mysql, "postgresql": ora2pg, "sqlite": ora2sqlite}
 CONV["sqlite"] = {"oracle": sqlite2ora, "sqlite": sqlite2sqlite}
+CONV["postgresql"] = {"oracle": pg2ora}
+CONV["mysql"] = {"oracle": mysql2ora}

@@ -89,21 +89,21 @@ class TestCase(unittest.TestCase):
         engine.execute(stmt)
 
     def __get_tables_insp(self):
-        o_engine = create_engine(self.origin)
-        d_engine = create_engine(self.dest)
+        o_eng = create_engine(self.origin)
+        d_eng = create_engine(self.dest)
 
         o_metadata = MetaData()
-        o_metadata.reflect(o_engine)
+        o_metadata.reflect(o_eng)
         d_metadata = MetaData()
-        d_metadata.reflect(d_engine)
+        d_metadata.reflect(d_eng)
 
         o_tables = filter(lambda x: x[0], o_metadata.tables.items())
         d_tables = filter(lambda x: x[0], d_metadata.tables.items())
         o_tables = {table_name: table for table_name, table in o_tables}
         d_tables = {table_name: table for table_name, table in d_tables}
 
-        o_insp = inspect(o_engine)
-        d_insp = inspect(d_engine)
+        o_insp = inspect(o_eng)
+        d_insp = inspect(d_eng)
 
         return o_tables, d_tables, o_insp, d_insp
 
