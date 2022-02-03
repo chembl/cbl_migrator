@@ -1,4 +1,5 @@
-from sqlalchemy.types import Numeric, Text, BigInteger, SmallInteger, Integer
+from sqlalchemy.types import Numeric, Text, String, BigInteger, SmallInteger, Integer
+from sqlalchemy.dialects.oracle import CLOB as ora_clob
 from sqlalchemy.dialects.mysql import (
     TINYINT as mysql_TINYINT,
     SMALLINT as mysql_SMALLINT,
@@ -94,6 +95,9 @@ def mysql2ora(col):
     """
     Not much tested
     """
+    if isinstance(col.type, String):
+        if not col.type.length:
+            col.type = col.type.adapt(ora_clob)
     return col
 
 
