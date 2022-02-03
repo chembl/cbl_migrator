@@ -42,13 +42,14 @@ def ora2pg(col):
     Used in ChEMBL dump generation
     """
     if isinstance(col.type, Numeric):
-        if not col.type.precision or col.type.precision > 4:
-            col.type = col.type.adapt(BigInteger)
-        else:
-            if col.type.precision <= 2:
-                col.type = col.type.adapt(SmallInteger)
-            elif 2 < col.type.precision <= 4:
-                col.type = col.type.adapt(Integer)
+        if col.type.scale == 0:
+            if not col.type.precision or col.type.precision > 4:
+                col.type = col.type.adapt(BigInteger)
+            else:
+                if col.type.precision <= 2:
+                    col.type = col.type.adapt(SmallInteger)
+                elif 2 < col.type.precision <= 4:
+                    col.type = col.type.adapt(Integer)
     return col
 
 
