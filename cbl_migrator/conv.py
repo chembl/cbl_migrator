@@ -9,7 +9,7 @@ from sqlalchemy.dialects.mysql import (
 )
 
 
-CONV = {}
+COLTYPE_CONV = {}
 
 
 def ora2mysql(col):
@@ -96,7 +96,7 @@ def mysql2ora(col):
     return col
 
 
-CONV["oracle"] = {"mysql": ora2mysql, "postgresql": ora2pg, "sqlite": ora2sqlite}
-CONV["sqlite"] = {"oracle": sqlite2ora, "sqlite": sqlite2sqlite}
-CONV["postgresql"] = {"oracle": pg2ora}
-CONV["mysql"] = {"oracle": mysql2ora}
+COLTYPE_CONV["oracle"] = {"mysql": ora2mysql, "postgresql": ora2pg, "sqlite": ora2sqlite}
+COLTYPE_CONV["sqlite"] = {"oracle": sqlite2ora, "sqlite": sqlite2sqlite}
+COLTYPE_CONV["postgresql"] = {"oracle": pg2ora}
+COLTYPE_CONV["mysql"] = {"oracle": mysql2ora}

@@ -15,54 +15,45 @@ from sqlalchemy import (
 )
 import concurrent.futures as cf
 import os
-from .conv import CONV
+from .conv import COLTYPE_CONV
 from .logs import logger
 
 
-def fill_table(o_eng_conn, d_eng_conn, table_name, chunk_size):
+def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
     """
     Fills existing table in dest with origin table data.
     """
-    logger.info(f"Migrating {table_name} table")
+    logger.info(f"Migrating {table.name} table")
     d_eng = create_engine(d_eng_conn, future=True)
-    d_metadata = MetaData()
-    d_metadata.reflect(d_eng)
-
     o_eng = create_engine(o_eng_conn, future=True)
+
     if d_eng.name == "mysql":
         # https://github.com/sqlalchemy/sqlalchemy/blob/ed78e679eafe787f4c152b78726bf1e1b91ab465/lib/sqlalchemy/dialects/mysql/base.py#L2332
         o_eng.dialect.max_identifier_length = 64
     if o_eng.dialect.max_identifier_length > d_eng.dialect.max_identifier_length:
         o_eng.dialect.max_identifier_length = d_eng.dialect.max_identifier_length
 
-    o_metadata = MetaData()
-    o_metadata.reflect(o_eng)
-
-    table = o_metadata.tables[table_name]
     pks = [c for c in table.primary_key.columns]
     pk = pks[0]
     single_pk = True if len(pks) == 1 else False
 
-    # Check if the table exists in migrated db, if needs to be completed and set starting pk id
-    try:
-        d_table = d_metadata.tables[table_name]
-    except Exception as e:
-        logger.error(f"Need to create {table_name} table before filling it", e)
-        raise Exception(f"Need to create {table_name} table before filling it")
-
-    dpk = [c for c in d_table.primary_key.columns][0]
+    dpk = [c for c in table.primary_key.columns][0]
     with o_eng.connect() as conn:
         count = conn.execute(select(func.count(pk))).scalar()
     with d_eng.connect() as conn:
-        d_count = conn.execute(select(func.count(dpk))).scalar()
+        try:
+            d_count = conn.execute(select(func.count(dpk))).scalar()
+        except Exception as e:
+            logger.error(f"Need to create {table.name} table before filling it", e)
+            raise Exception(f"Need to create {table.name} table before filling it")
     first_it = True
     if count == d_count:
         logger.info(
-            f"{table_name} table exists in dest and has same counts than origin table. Skipping."
+            f"{table.name} table exists in dest and has same counts than origin table. Skipping."
         )
         return True
     elif count != d_count and d_count != 0:
-        q = select(d_table).order_by(dpk.desc()).limit(1)
+        q = select(table).order_by(dpk.desc()).limit(1)
         with d_eng.connect() as conn:
             res = conn.execute(q)
             last_id = res.first().__getitem__(dpk.name)
@@ -122,7 +113,7 @@ def fill_table(o_eng_conn, d_eng_conn, table_name, chunk_size):
                         )
                 else:
                     break
-    logger.info(f"{table_name} table filled")
+    logger.info(f"{table.name} table filled")
     return True
 
 
@@ -163,8 +154,8 @@ class DbMigrator:
     def __fix_column_type(self, col, o_eng, d_eng):
         """
         Adapt column types to the most reasonable generic types (ie. VARCHAR -> String)
-        Borrowed from sqlacodegen.
         """
+        # bit borrowed from sqlacodegen
         cls = col.type.__class__
         for supercls in cls.__mro__:
             if hasattr(supercls, "__visit_name__"):
@@ -178,8 +169,8 @@ class DbMigrator:
         # unset any server default value
         col.server_default = None
 
-        if o_eng in CONV and d_eng in CONV[o_eng]:
-            col = CONV[o_eng][d_eng](col)
+        if o_eng in COLTYPE_CONV and d_eng in COLTYPE_CONV[o_eng]:
+            col = COLTYPE_CONV[o_eng][d_eng](col)
         else:
             raise Exception(f"Migration from {o_eng} to {d_eng} not available")
         return col
@@ -389,19 +380,20 @@ class DbMigrator:
             metadata = MetaData()
             metadata.reflect(o_eng)
             insp = inspect(o_eng)
-            tables = [
+            table_names = [
                 table[0]
                 for table in insp.get_sorted_table_and_fkc_names()
-                if table[0] and table[0] not in self.exclude 
+                if table[0] and table[0] not in self.exclude
             ]
+            tables = [metadata.tables[table_name] for table_name in table_names]
 
             # SQLite accepts concurrent read but not write
             processes = 1 if d_eng.name == "sqlite" else self.n_cores
+            o_eng.dispose()
+            d_eng.dispose()
             if processes == 1:
                 for table in tables:
-                    status = fill_table(self.o_eng_conn, self.d_eng_conn, table, chunk_size)
-                    if not status:
-                        logger.error(f"Something went wrong when copying table: {table}")
+                    fill_table(self.o_eng_conn, self.d_eng_conn, table, chunk_size)
             else:
                 with cf.ProcessPoolExecutor(max_workers=processes) as exe:
                     futures = {
