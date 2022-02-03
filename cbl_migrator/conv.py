@@ -1,4 +1,5 @@
-from sqlalchemy.types import Numeric, Text, BigInteger, SmallInteger, Integer
+from sqlalchemy.types import Numeric, Text, String, BigInteger, SmallInteger, Integer
+from sqlalchemy.dialects.oracle import CLOB as ora_clob
 from sqlalchemy.dialects.mysql import (
     TINYINT as mysql_TINYINT,
     SMALLINT as mysql_SMALLINT,
@@ -30,8 +31,8 @@ def ora2mysql(col):
                 col.type = mysql_BIGINT()
         else:
             if not col.type.precision and not col.type.scale:
-                col.type.precision = 64  # max mysql precision
-                col.type.scale = 30  # max mysql scale
+                col.type.precision = 30 # max oracle precision
+                col.type.scale = 30 # max mysql scale
     elif isinstance(col.type, Text):
         col.type = col.type.adapt(mysql_LONGTEXT)
     return col
@@ -94,10 +95,15 @@ def mysql2ora(col):
     """
     Not much tested
     """
+    if isinstance(col.type, String):
+        if not col.type.length:
+            col.type = col.type.adapt(ora_clob)
+    if isinstance(col.type, Numeric):
+        if col.type.precision > 30:
+            col.type.precision = 30
     return col
 
 
 COLTYPE_CONV["oracle"] = {"mysql": ora2mysql, "postgresql": ora2pg, "sqlite": ora2sqlite}
 COLTYPE_CONV["sqlite"] = {"oracle": sqlite2ora, "sqlite": sqlite2sqlite}
 COLTYPE_CONV["postgresql"] = {"oracle": pg2ora}
-COLTYPE_CONV["mysql"] = {"oracle": mysql2ora}
