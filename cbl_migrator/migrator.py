@@ -389,34 +389,28 @@ class DbMigrator:
 
             # SQLite accepts concurrent read but not write
             processes = 1 if d_eng.name == "sqlite" else self.n_cores
-            o_eng.dispose()
-            d_eng.dispose()
-            if processes == 1:
-                for table in tables:
-                    fill_table(self.o_eng_conn, self.d_eng_conn, table, chunk_size)
-            else:
-                with cf.ProcessPoolExecutor(max_workers=processes) as exe:
-                    futures = {
-                        exe.submit(
-                            fill_table,
-                            self.o_eng_conn,
-                            self.d_eng_conn,
-                            table,
-                            chunk_size,
-                        ): table
-                        for table in tables
-                    }
+            with cf.ProcessPoolExecutor(max_workers=processes) as exe:
+                futures = {
+                    exe.submit(
+                        fill_table,
+                        self.o_eng_conn,
+                        self.d_eng_conn,
+                        table,
+                        chunk_size,
+                    ): table
+                    for table in tables
+                }
 
-                    for future in cf.as_completed(futures):
-                        table = futures[future]
-                        try:
-                            res = future.result()
-                            if not res:
-                                logger.error(
-                                    f"Something went wrong when copying table: {table}"
-                                )
-                        except Exception as e:
-                            logger.error(f"Table {table} worker died: ", e)
+                for future in cf.as_completed(futures):
+                    table = futures[future]
+                    try:
+                        res = future.result()
+                        if not res:
+                            logger.error(
+                                f"Something went wrong when copying table: {table}"
+                            )
+                    except Exception as e:
+                        logger.error(f"Table {table} worker died: ", e)
 
         # check row counts for each table
         if not copy_data:
