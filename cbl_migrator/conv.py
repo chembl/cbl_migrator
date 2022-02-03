@@ -107,4 +107,3 @@ def mysql2ora(col):
 COLTYPE_CONV["oracle"] = {"mysql": ora2mysql, "postgresql": ora2pg, "sqlite": ora2sqlite}
 COLTYPE_CONV["sqlite"] = {"oracle": sqlite2ora, "sqlite": sqlite2sqlite}
 COLTYPE_CONV["postgresql"] = {"oracle": pg2ora}
-COLTYPE_CONV["mysql"] = {"oracle": mysql2ora}
