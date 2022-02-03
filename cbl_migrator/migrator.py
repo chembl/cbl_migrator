@@ -324,14 +324,10 @@ class DbMigrator:
         tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
         for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
-            pks = insp.get_primary_keys(table_name)
             # UKs are internally implemented as a unique indexes.
             # Do not create index if it exists a UK for that field.
             indexes_to_keep = filter(
                 lambda index: index.name not in [x["name"] for x in uks], table.indexes
-            )
-            indexes_to_keep = filter(
-                lambda index: index.name not in [x["name"] for x in pks], indexes_to_keep
             )
 
             for index in indexes_to_keep:
