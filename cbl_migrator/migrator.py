@@ -328,8 +328,8 @@ class DbMigrator:
             # UKs are internally implemented as a unique indexes.
             # Do not create index if it exists a UK for that field.
             indexes_to_keep = filter(
-                lambda index: index.name not in [x["name"] for x in uks]
-                and index.name != pk["name"],
+                lambda index: index.name.lower() not in [x["name"].lower() for x in uks]
+                and index.name.lower() != pk["name"].lower(),
                 table.indexes,
             )
 
