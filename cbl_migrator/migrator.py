@@ -155,21 +155,22 @@ class DbMigrator:
         """
         Adapt column types to the most reasonable generic types (ie. VARCHAR -> String)
         """
-        # bit borrowed from sqlacodegen.
-        for supercls in col.type.__class__.__mro__:
-            if not supercls.__name__.startswith("_") and hasattr(
-                supercls, "__visit_name__"
+        # bit borrowed from sqlacodegen
+        cls = col.type.__class__
+        for supercls in cls.__mro__:
+            if hasattr(supercls, "__visit_name__"):
+                cls = supercls
+            if supercls.__name__ != supercls.__name__.upper() and not supercls.__name__.startswith(
+                "_"
             ):
-                try:
-                    col.type = col.type.adapt(supercls)
-                except TypeError:
-                    break
+                break
+        col.type = col.type.adapt(cls)
 
         # unset any server default value
         col.server_default = None
 
         if o_eng in COLTYPE_CONV and d_eng in COLTYPE_CONV[o_eng]:
-            col.type = COLTYPE_CONV[o_eng][d_eng](col.type)
+            col = COLTYPE_CONV[o_eng][d_eng](col)
         else:
             raise Exception(f"Migration from {o_eng} to {d_eng} not available")
         return col
