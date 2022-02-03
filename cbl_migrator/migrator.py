@@ -13,7 +13,7 @@ from sqlalchemy import (
     create_engine,
     inspect,
 )
-import concurrent.futures as cf
+from multiprocessing import Pool
 import os
 from .conv import COLTYPE_CONV
 from .logs import logger
@@ -402,28 +402,8 @@ class DbMigrator:
                     if not status:
                         logger.error(f"Something went wrong when copying table: {table}")
             else:
-                with cf.ProcessPoolExecutor(max_workers=processes) as exe:
-                    futures = {
-                        exe.submit(
-                            fill_table,
-                            self.o_eng_conn,
-                            self.d_eng_conn,
-                            table,
-                            chunk_size,
-                        ): table
-                        for table in tables
-                    }
-
-                    for future in cf.as_completed(futures):
-                        table = futures[future]
-                        try:
-                            res = future.result()
-                            if not res:
-                                logger.error(
-                                    f"Something went wrong when copying table: {table}"
-                                )
-                        except Exception as e:
-                            logger.error(f"Table {table} worker died: ", e)
+                with Pool(processes) as pool:
+                    pool.starmap(fill_table, [[self.o_eng_conn, self.d_eng_conn, table, chunk_size] for table in tables])
 
         # check row counts for each table
         if not copy_data:
