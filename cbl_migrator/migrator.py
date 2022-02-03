@@ -15,7 +15,7 @@ from sqlalchemy import (
 )
 import concurrent.futures as cf
 import os
-from .conv import CONV
+from .conv import COLTYPE_CONV
 from .logs import logger
 
 
@@ -163,23 +163,20 @@ class DbMigrator:
     def __fix_column_type(self, col, o_eng, d_eng):
         """
         Adapt column types to the most reasonable generic types (ie. VARCHAR -> String)
-        Borrowed from sqlacodegen.
         """
-        cls = col.type.__class__
-        for supercls in cls.__mro__:
-            if hasattr(supercls, "__visit_name__"):
-                cls = supercls
-            if supercls.__name__ != supercls.__name__.upper() and not supercls.__name__.startswith(
-                "_"
-            ):
-                break
-        col.type = col.type.adapt(cls)
+        # bit borrowed from sqlacodegen.
+        for supercls in col.type.__class__.__mro__:
+            if not supercls.__name__.startswith("_") and hasattr(supercls, "__visit_name__"):
+                try:
+                    col.type = col.type.adapt(supercls)
+                except TypeError:
+                    break
 
         # unset any server default value
         col.server_default = None
 
-        if o_eng in CONV and d_eng in CONV[o_eng]:
-            col = CONV[o_eng][d_eng](col)
+        if o_eng in COLTYPE_CONV and d_eng in COLTYPE_CONV[o_eng]:
+            col.type = COLTYPE_CONV[o_eng][d_eng](col.type)
         else:
             raise Exception(f"Migration from {o_eng} to {d_eng} not available")
         return col
@@ -397,6 +394,8 @@ class DbMigrator:
 
             # SQLite accepts concurrent read but not write
             processes = 1 if d_eng.name == "sqlite" else self.n_cores
+            o_eng.dispose()
+            d_eng.dispose()
             if processes == 1:
                 for table in tables:
                     status = fill_table(self.o_eng_conn, self.d_eng_conn, table, chunk_size)
