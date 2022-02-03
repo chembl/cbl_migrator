@@ -166,7 +166,9 @@ class DbMigrator:
         """
         # bit borrowed from sqlacodegen.
         for supercls in col.type.__class__.__mro__:
-            if not supercls.__name__.startswith("_") and hasattr(supercls, "__visit_name__"):
+            if not supercls.__name__.startswith("_") and hasattr(
+                supercls, "__visit_name__"
+            ):
                 try:
                     col.type = col.type.adapt(supercls)
                 except TypeError:
@@ -389,7 +391,7 @@ class DbMigrator:
             tables = [
                 table[0]
                 for table in insp.get_sorted_table_and_fkc_names()
-                if table[0] and table[0] not in self.exclude 
+                if table[0] and table[0] not in self.exclude
             ]
 
             # SQLite accepts concurrent read but not write
@@ -398,12 +400,16 @@ class DbMigrator:
             d_eng.dispose()
             if processes == 1:
                 for table in tables:
-                    status = fill_table(self.o_eng_conn, self.d_eng_conn, table, chunk_size)
-                    if not status:
-                        logger.error(f"Something went wrong when copying table: {table}")
+                    fill_table(self.o_eng_conn, self.d_eng_conn, table, chunk_size)
             else:
                 with Pool(processes) as pool:
-                    pool.starmap(fill_table, [[self.o_eng_conn, self.d_eng_conn, table, chunk_size] for table in tables])
+                    pool.starmap(
+                        fill_table,
+                        [
+                            [self.o_eng_conn, self.d_eng_conn, table, chunk_size]
+                            for table in tables
+                        ],
+                    )
 
         # check row counts for each table
         if not copy_data:
