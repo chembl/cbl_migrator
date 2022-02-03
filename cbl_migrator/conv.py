@@ -31,8 +31,8 @@ def ora2mysql(col):
                 col.type = mysql_BIGINT()
         else:
             if not col.type.precision and not col.type.scale:
-                col.type.precision = 64  # max mysql precision
-                col.type.scale = 30  # max mysql scale
+                col.type.precision = 30 # max oracle precision
+                col.type.scale = 30 # max mysql scale
     elif isinstance(col.type, Text):
         col.type = col.type.adapt(mysql_LONGTEXT)
     return col
@@ -98,6 +98,9 @@ def mysql2ora(col):
     if isinstance(col.type, String):
         if not col.type.length:
             col.type = col.type.adapt(ora_clob)
+    if isinstance(col.type, Numeric):
+        if col.type.precision > 30:
+            col.type.precision = 30
     return col
 
 
