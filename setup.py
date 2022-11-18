@@ -13,7 +13,7 @@ if __name__ == '__main__':
         long_description=open('README.md', encoding='utf-8').read(),
         long_description_content_type='text/markdown',
         install_requires=['SQLAlchemy~=1.4'],
-        tests_require=['exrex'],
+        tests_require=['exrex', 'pytest'],
         entry_points = {
             'console_scripts': ['cbl-migrator=cbl_migrator.bin.run_migrator:main'],
         },
