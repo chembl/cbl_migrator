@@ -160,8 +160,9 @@ class DbMigrator:
         for supercls in cls.__mro__:
             if hasattr(supercls, "__visit_name__"):
                 cls = supercls
-            if supercls.__name__ != supercls.__name__.upper() and not supercls.__name__.startswith(
-                "_"
+            if (
+                supercls.__name__ != supercls.__name__.upper()
+                and not supercls.__name__.startswith("_")
             ):
                 break
         col.type = col.type.adapt(cls)
@@ -176,7 +177,7 @@ class DbMigrator:
         return col
 
     def __copy_schema(self):
-        """        
+        """
         Copies the schema to dest db.
         Copies all constraints in sqlite, only pk in mysql and postgres.
         """
