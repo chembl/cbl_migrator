@@ -3,7 +3,7 @@ from setuptools import setup
 if __name__ == "__main__":
     setup(
         name="cbl_migrator",
-        version="0.3.3",
+        version="0.3.4",
         author="Eloy Félix",
         author_email="eloyfelix@gmail.com",
         description="Migrates Oracle dbs to PostgreSQL, MySQL and SQLite",
