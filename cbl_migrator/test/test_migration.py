@@ -2,7 +2,6 @@ from sqlalchemy import MetaData, create_engine, inspect
 from .schema import Base, Compound, CompoundStructure, CompoundProperties
 from .. import DbMigrator
 import unittest
-import exrex
 import random
 import os
 
@@ -39,6 +38,51 @@ molblock = """
 M  END
 """
 
+inchis = [
+    "HCHKCACWOHOZIP-UHFFFAOYSA-N",
+    "VNWKTOKETHGBQD-UHFFFAOYSA-N",
+    "QAOWNCQODCNURD-UHFFFAOYSA-N",
+    "FHLGUOHLUFIAAA-UHFFFAOYSA-N",
+    "LVHBHZANLOWSRM-UHFFFAOYSA-N",
+    "XEEYBQQBJWHFJM-UHFFFAOYSA-N",
+    "XLYOFNOQVPJJNP-UHFFFAOYSA-N",
+    "ISWSIDIOOBJBQZ-UHFFFAOYSA-N",
+    "XWJBRBSPAODJER-UHFFFAOYSA-N",
+    "NTTOTNSKUYCDAV-UHFFFAOYSA-N",
+    "IKFRSFGCRAORBO-UHFFFAOYSA-N",
+    "NBIIXXVUZAFLBC-UHFFFAOYSA-N",
+    "QSHDDOUJBYECFT-UHFFFAOYSA-N",
+    "WGLPBDUCMAPZCE-UHFFFAOYSA-N",
+    "KKLWSPPIRBIEOV-UHFFFAOYSA-N",
+    "YKSNLCVSTHTHJA-UHFFFAOYSA-L",
+    "VYPSYNLAJGMNEJ-UHFFFAOYSA-N",
+    "XDSSGQHOYWGIKC-UHFFFAOYSA-N",
+    "WAQIIHCCEMGYKP-UHFFFAOYSA-N",
+    "UORVGPXVDQYIDP-UHFFFAOYSA-N",
+    "VGGSQFUCUMXWEO-UHFFFAOYSA-N",
+    "IMEVSAIFJKKDAP-UHFFFAOYSA-N",
+    "QWTDNUCVQCZILF-UHFFFAOYSA-N",
+    "VYZAMTAEIAYCRO-UHFFFAOYSA-N",
+    "RRHGJUQNOFWUDK-UHFFFAOYSA-N",
+    "NNPPMTNAJDCUHE-UHFFFAOYSA-N",
+    "HZZVJAQRINQKSD-PBFISZAISA-N",
+    "KWYUFKZDYYNOTN-UHFFFAOYSA-M",
+    "AZDRQVAHHNSJOQ-UHFFFAOYSA-N",
+    "IAZDPXIOMUYVGZ-UHFFFAOYSA-N",
+    "XSQUKJJJFZCRTK-UHFFFAOYSA-N",
+    "KFDVPJUYSDEJTH-UHFFFAOYSA-N",
+    "RAXXELZNTBOGNW-UHFFFAOYSA-N",
+    "JYQUHIFYBATCCY-UHFFFAOYSA-N",
+    "LYCAIKOWRPUZTN-UHFFFAOYSA-N",
+    "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
+    "HQVNEWCFYHHQES-UHFFFAOYSA-N",
+    "RYFMWSXOAZQYPI-UHFFFAOYSA-K",
+    "QTBSBXVTEAMEQO-UHFFFAOYSA-N",
+    "OKKJLVBELUTLKV-UHFFFAOYSA-N",
+    "NIXOWILDQLNWCW-UHFFFAOYSA-N",
+    "OSSNTDFYBPYIEC-UHFFFAOYSA-N",
+]
+
 
 class TestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -66,7 +110,7 @@ class TestCase(unittest.TestCase):
         structure_data = []
         for i in range(1, 42):
             smiles = "CC(=O)Oc1ccccc1C(=O)O"
-            inchi_key = exrex.getone(r"[A-Z]{14}-[A-Z]{10}-[A-Z]")
+            inchi_key = inchis[i - 1]
             structure_data.append(
                 {
                     "sid": i,
@@ -158,6 +202,7 @@ class TestCase(unittest.TestCase):
     def tearDownClass(cls):
         os.remove("origin.db")
         os.remove("dest.db")
+
 
 if __name__ == "__main__":
     unittest.main()
