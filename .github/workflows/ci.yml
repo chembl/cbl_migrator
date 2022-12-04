@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install cbl-migrator
         shell: bash -l {0}
-        run: pip install -e . exrex pytest
+        run: pip install -e . pytest
       - name: Run tests
         shell: bash -l {0}
         run: pytest
