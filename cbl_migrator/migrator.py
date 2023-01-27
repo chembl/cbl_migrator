@@ -97,7 +97,7 @@ def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
                 res = connr.execute(q)
                 data = res.all()
                 if len(data):
-                    last_id = data[-1].__getitem__(pk.name)
+                    last_id = getattr(data[-1], pk.name)
                     with d_eng.begin() as conn:
                         conn.execute(
                             table.insert(),
