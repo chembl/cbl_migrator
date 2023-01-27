@@ -3,7 +3,7 @@ from setuptools import setup
 if __name__ == "__main__":
     setup(
         name="cbl_migrator",
-        version="0.3.4",
+        version="0.3.5",
         author="Eloy Félix",
         author_email="eloyfelix@gmail.com",
         description="Migrates Oracle dbs to PostgreSQL, MySQL and SQLite",
@@ -12,7 +12,7 @@ if __name__ == "__main__":
         packages=["cbl_migrator", "cbl_migrator.bin"],
         long_description=open("README.md", encoding="utf-8").read(),
         long_description_content_type="text/markdown",
-        install_requires=["SQLAlchemy~=1.4"],
+        install_requires=["SQLAlchemy~=2.0"],
         tests_require=["pytest"],
         entry_points={
             "console_scripts": ["cbl-migrator=cbl_migrator.bin.run_migrator:main"],
