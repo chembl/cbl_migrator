@@ -1,4 +1,4 @@
-from sqlalchemy import MetaData, create_engine, inspect
+from sqlalchemy import MetaData, create_engine, inspect, insert
 from .schema import Base, Compound, CompoundStructure, CompoundProperties
 from .. import DbMigrator
 import unittest
@@ -97,40 +97,38 @@ class TestCase(unittest.TestCase):
         engine = create_engine(self.origin)
         Base.metadata.create_all(bind=engine)
 
-        # compound data
-        stmt = Compound.__table__.insert(
-            [
-                {"cid": i, "structure_type": "MOL", "compound_name": "chemblone"}
-                for i in range(1, 42)
-            ]
-        )
-        engine.execute(stmt)
+        com_stmt = insert(Compound)
+        com_struct_stmt = insert(CompoundStructure)
+        com_props_stmt = insert(CompoundProperties)
 
-        # structure data
-        structure_data = []
-        for i in range(1, 42):
-            smiles = "CC(=O)Oc1ccccc1C(=O)O"
-            inchi_key = inchis[i - 1]
-            structure_data.append(
-                {
-                    "sid": i,
-                    "cid": i,
-                    "smiles": smiles,
-                    "molblock": molblock,
-                    "inchi_key": inchi_key,
-                }
+        with engine.begin() as conn:
+            conn.execute(
+                com_stmt,
+                [
+                    {"cid": i, "structure_type": "MOL", "compound_name": "chemblone"}
+                    for i in range(1, 42)
+                ],
             )
-        stmt = CompoundStructure.__table__.insert(structure_data)
-        engine.execute(stmt)
-
-        # properties data
-        stmt = CompoundProperties.__table__.insert(
-            [
-                {"pid": i, "cid": i, "mw": random.random(), "logp": random.random()}
-                for i in range(1, 42)
-            ]
-        )
-        engine.execute(stmt)
+            conn.execute(
+                com_struct_stmt,
+                [
+                    {
+                        "sid": i,
+                        "cid": i,
+                        "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+                        "molblock": molblock,
+                        "inchi_key": inchis[i - 1],
+                    }
+                    for i in range(1, 42)
+                ],
+            )
+            conn.execute(
+                com_props_stmt,
+                [
+                    {"pid": i, "cid": i, "mw": random.random(), "logp": random.random()}
+                    for i in range(1, 42)
+                ],
+            )
 
     def __get_tables_insp(self):
         o_eng = create_engine(self.origin)
