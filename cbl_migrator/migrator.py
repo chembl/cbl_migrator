@@ -225,7 +225,7 @@ class DbMigrator:
                 col = self.__fix_column_type(col, o_eng.name, d_eng.name)
                 col.autoincrement = False
                 new_metadata_cols.add(col)
-            table.columns = new_metadata_cols.as_immutable()
+            table.columns = new_metadata_cols.as_readonly()
             new_metadata_tables[table_name] = table
         metadata.tables = immutabledict(new_metadata_tables)
         metadata.create_all(d_eng)
