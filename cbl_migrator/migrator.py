@@ -24,8 +24,8 @@ def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
     Fills existing table in dest with origin table data.
     """
     logger.info(f"Migrating {table.name} table")
-    d_eng = create_engine(d_eng_conn, future=True)
-    o_eng = create_engine(o_eng_conn, future=True)
+    d_eng = create_engine(d_eng_conn)
+    o_eng = create_engine(o_eng_conn)
 
     if d_eng.name == "mysql":
         # https://github.com/sqlalchemy/sqlalchemy/blob/ed78e679eafe787f4c152b78726bf1e1b91ab465/lib/sqlalchemy/dialects/mysql/base.py#L2332
@@ -140,7 +140,7 @@ class DbMigrator:
         self.d_eng_conn = d_conn_string
         self.n_cores = n_workers
 
-        o_eng = create_engine(self.o_eng_conn, future=True)
+        o_eng = create_engine(self.o_eng_conn)
         metadata = MetaData()
         metadata.reflect(o_eng)
         no_pk = []
@@ -181,8 +181,8 @@ class DbMigrator:
         Copies the schema to dest db.
         Copies all constraints in sqlite, only pk in mysql and postgres.
         """
-        o_eng = create_engine(self.o_eng_conn, future=True)
-        d_eng = create_engine(self.d_eng_conn, future=True)
+        o_eng = create_engine(self.o_eng_conn)
+        d_eng = create_engine(self.d_eng_conn)
         metadata = MetaData()
         metadata.reflect(o_eng)
         insp = inspect(o_eng)
@@ -234,10 +234,10 @@ class DbMigrator:
         """
         Checks that counts for all tables in origin an dest dbs are equal.
         """
-        o_eng = create_engine(self.o_eng_conn, future=True)
+        o_eng = create_engine(self.o_eng_conn)
         o_metadata = MetaData()
         o_metadata.reflect(o_eng)
-        d_eng = create_engine(self.d_eng_conn, future=True)
+        d_eng = create_engine(self.d_eng_conn)
         d_metadata = MetaData()
         d_metadata.reflect(d_eng)
 
@@ -271,8 +271,8 @@ class DbMigrator:
         """
         Migrates constraints, UKs, CCs and FKs.
         """
-        o_eng = create_engine(self.o_eng_conn, future=True)
-        d_eng = create_engine(self.d_eng_conn, future=True)
+        o_eng = create_engine(self.o_eng_conn)
+        d_eng = create_engine(self.d_eng_conn)
         metadata = MetaData()
         metadata.reflect(o_eng)
 
@@ -315,8 +315,8 @@ class DbMigrator:
         """
         Creates indexes in dest when possible.
         """
-        o_eng = create_engine(self.o_eng_conn, future=True)
-        d_eng = create_engine(self.d_eng_conn, future=True)
+        o_eng = create_engine(self.o_eng_conn)
+        d_eng = create_engine(self.d_eng_conn)
         metadata = MetaData()
         metadata.reflect(o_eng)
 
@@ -359,8 +359,8 @@ class DbMigrator:
             copy_indexes: Bool. False won't create indexes in dest.
             chunk_size: Number of records copied in each chunk.
         """
-        o_eng = create_engine(self.o_eng_conn, future=True)
-        d_eng = create_engine(self.d_eng_conn, future=True)
+        o_eng = create_engine(self.o_eng_conn)
+        d_eng = create_engine(self.d_eng_conn)
 
         if o_eng.dialect.max_identifier_length > d_eng.dialect.max_identifier_length:
             logger.info(f"{o_eng.name} max_identifier_length larger than {d_eng.name}")
