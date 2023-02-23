@@ -3,9 +3,9 @@ from setuptools import setup
 if __name__ == "__main__":
     setup(
         name="cbl_migrator",
-        version="0.3.5",
+        version="0.3.6",
         author="Eloy Félix",
-        author_email="eloyfelix@gmail.com",
+        author_email="efelix@ebi.ac.uk",
         description="Migrates Oracle dbs to PostgreSQL, MySQL and SQLite",
         url="https://github.com/chembl/cbl_migrator",
         license="MIT",

@@ -53,10 +53,9 @@ def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
         )
         return True
     elif count != d_count and d_count != 0:
-        q = select(table).order_by(dpk.desc()).limit(1)
+        q = select(dpk).order_by(dpk.desc()).limit(1)
         with d_eng.connect() as conn:
-            res = conn.execute(q)
-            last_id = res.first().__getitem__(dpk.name)
+            last_id = conn.scalar(q)
         first_it = False
 
     # table has a composite pk (usualy a bad design choice).
