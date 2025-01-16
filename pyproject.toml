@@ -32,5 +32,6 @@ cbl-migrator = "cbl_migrator.bin.run_migrator:main"
 [tool.setuptools.packages.find]
 include = ["cbl_migrator", "cbl_migrator.bin"]
 
-[project.dependencies]
-SQLAlchemy = "~=2.0"
+dependencies = [
+    "SQLAlchemy~=2.0"
+]
