@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
     name: Python ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v3
@@ -52,7 +52,7 @@ jobs:
       with:
         python-version: "3.x"
 
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4.1.7
       with:
         name: artifact
         path: dist
