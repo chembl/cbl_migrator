@@ -92,7 +92,6 @@ class TestCase(unittest.TestCase):
         self.dest = "sqlite:///dest.db"
 
     def __gen_test_data(self):
-
         # create schema
         engine = create_engine(self.origin)
         Base.metadata.create_all(bind=engine)

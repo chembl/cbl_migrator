@@ -27,7 +27,8 @@ def insert_rows_in_dest(table, data, d_eng):
         conn.execute(
             table.insert(),
             [
-                dict(zip(res_keys, row)) for res_keys, row in zip([data.keys()] * len(data.all()), data.all())
+                dict(zip(res_keys, row))
+                for res_keys, row in zip([data.keys()] * len(data.all()), data.all())
             ],
         )
 
@@ -51,10 +52,7 @@ def chunked_copy_single_pk(table, pk, last_id, chunk_size, o_eng, d_eng):
                 with d_eng.begin() as conn:
                     conn.execute(
                         table.insert(),
-                        [
-                            dict(zip(res.keys(), row))
-                            for row in data
-                        ],
+                        [dict(zip(res.keys(), row)) for row in data],
                     )
             else:
                 break
@@ -72,10 +70,7 @@ def chunked_copy_multi_pk(table, pks, count, offset, chunk_size, o_eng, d_eng):
             with d_eng.begin() as conn:
                 conn.execute(
                     table.insert(),
-                    [
-                        dict(zip(res.keys(), row))
-                        for row in data
-                    ],
+                    [dict(zip(res.keys(), row)) for row in data],
                 )
 
 
@@ -110,9 +105,7 @@ def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
             raise
 
     if count == d_count:
-        logger.info(
-            f"{table.name} already matches origin row count. Skipping."
-        )
+        logger.info(f"{table.name} already matches origin row count. Skipping.")
         return True
     elif count != d_count and d_count != 0:
         q = select(pk).order_by(pk.desc()).limit(1)
@@ -156,7 +149,11 @@ class DbMigrator:
         o_eng = create_engine(self.o_eng_conn)
         metadata = MetaData()
         metadata.reflect(o_eng)
-        no_pk = [t for t, table in metadata.tables.items() if not list(table.primary_key.columns)]
+        no_pk = [
+            t
+            for t, table in metadata.tables.items()
+            if not list(table.primary_key.columns)
+        ]
         self.exclude = exclude + no_pk
 
     def __fix_column_type(self, col, o_eng, d_eng):
@@ -183,7 +180,7 @@ class DbMigrator:
 
     def __copy_schema(self):
         """
-        Copies schema from origin to destination, preserving PKs, 
+        Copies schema from origin to destination, preserving PKs,
         and optionally other constraints if destination is SQLite.
         """
         o_eng = create_engine(self.o_eng_conn)
@@ -205,11 +202,21 @@ class DbMigrator:
                 # Retain all constraints for SQLite
                 uks = insp.get_unique_constraints(table_name)
                 for uk in uks:
-                    uk_cols = [c for c in table._columns if c.name in uk["column_names"]]
+                    uk_cols = [
+                        c for c in table._columns if c.name in uk["column_names"]
+                    ]
                     keep_constraints.append(UniqueConstraint(*uk_cols, name=uk["name"]))
-                for fk in [cons for cons in table.constraints if isinstance(cons, ForeignKeyConstraint)]:
+                for fk in [
+                    cons
+                    for cons in table.constraints
+                    if isinstance(cons, ForeignKeyConstraint)
+                ]:
                     keep_constraints.append(fk)
-                for cc in [cons for cons in table.constraints if isinstance(cons, CheckConstraint)]:
+                for cc in [
+                    cons
+                    for cons in table.constraints
+                    if isinstance(cons, CheckConstraint)
+                ]:
                     cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
                     keep_constraints.append(cc)
             table.constraints = set(keep_constraints)
@@ -228,7 +235,7 @@ class DbMigrator:
 
     def validate_migration(self):
         """
-        Checks row counts for all tables in both origin and destination 
+        Checks row counts for all tables in both origin and destination
         to confirm migration success.
         """
         o_eng = create_engine(self.o_eng_conn)
@@ -239,14 +246,10 @@ class DbMigrator:
         d_metadata.reflect(d_eng)
 
         o_tables = {
-            t: tbl
-            for t, tbl in o_metadata.tables.items()
-            if t not in self.exclude
+            t: tbl for t, tbl in o_metadata.tables.items() if t not in self.exclude
         }
         d_tables = {
-            t: tbl
-            for t, tbl in d_metadata.tables.items()
-            if t not in self.exclude
+            t: tbl for t, tbl in d_metadata.tables.items() if t not in self.exclude
         }
 
         if set(o_tables.keys()) != set(d_tables.keys()):
@@ -256,9 +259,7 @@ class DbMigrator:
         with o_eng.connect() as o_s, d_eng.connect() as d_s:
             for table_name, table in o_tables.items():
                 migrated_table = d_tables[table_name]
-                o_count = o_s.execute(
-                    select(func.count()).select_from(table)
-                ).scalar()
+                o_count = o_s.execute(select(func.count()).select_from(table)).scalar()
                 d_count = d_s.execute(
                     select(func.count()).select_from(migrated_table)
                 ).scalar()
@@ -292,13 +293,19 @@ class DbMigrator:
                 constraints_to_keep.append(uuk)
 
             # Check constraints
-            ccs = [cons for cons in table.constraints if isinstance(cons, CheckConstraint)]
+            ccs = [
+                cons for cons in table.constraints if isinstance(cons, CheckConstraint)
+            ]
             for cc in ccs:
                 cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
                 constraints_to_keep.append(cc)
 
             # Foreign keys
-            fks = [cons for cons in table.constraints if isinstance(cons, ForeignKeyConstraint)]
+            fks = [
+                cons
+                for cons in table.constraints
+                if isinstance(cons, ForeignKeyConstraint)
+            ]
             constraints_to_keep.extend(fks)
 
             # Create constraints
@@ -311,7 +318,7 @@ class DbMigrator:
 
     def __copy_indexes(self):
         """
-        Creates indexes in the destination DB, skipping those 
+        Creates indexes in the destination DB, skipping those
         already defined via unique or primary constraints.
         """
         o_eng = create_engine(self.o_eng_conn)
@@ -326,9 +333,9 @@ class DbMigrator:
             pk = insp.get_pk_constraint(table_name)
 
             indexes_to_keep = [
-                idx for idx in table.indexes
-                if idx.name not in [u["name"] for u in uks]
-                and idx.name != pk["name"]
+                idx
+                for idx in table.indexes
+                if idx.name not in [u["name"] for u in uks] and idx.name != pk["name"]
             ]
             for index in indexes_to_keep:
                 try:
@@ -363,7 +370,11 @@ class DbMigrator:
         # Basic SQLite checks
         if o_eng.name == "sqlite":
             sqlite_db_path = o_eng.url.database
-            if not sqlite_db_path or not os.path.isfile(sqlite_db_path) or os.path.getsize(sqlite_db_path) < 100:
+            if (
+                not sqlite_db_path
+                or not os.path.isfile(sqlite_db_path)
+                or os.path.getsize(sqlite_db_path) < 100
+            ):
                 raise Exception("Origin SQLite database doesn't exist or is too small")
 
         if copy_schema:
@@ -377,7 +388,8 @@ class DbMigrator:
             metadata.reflect(o_eng)
             insp = inspect(o_eng)
             table_names = [
-                t for t, _ in insp.get_sorted_table_and_fkc_names()
+                t
+                for t, _ in insp.get_sorted_table_and_fkc_names()
                 if t and t not in self.exclude
             ]
             tables = [metadata.tables[t] for t in table_names]
@@ -386,7 +398,9 @@ class DbMigrator:
 
             with cf.ProcessPoolExecutor(max_workers=processes) as exe:
                 futures = {
-                    exe.submit(fill_table, self.o_eng_conn, self.d_eng_conn, table, chunk_size): table
+                    exe.submit(
+                        fill_table, self.o_eng_conn, self.d_eng_conn, table, chunk_size
+                    ): table
                     for table in tables
                 }
                 for future in cf.as_completed(futures):
