@@ -22,7 +22,6 @@ class Compound(Base):
 
 
 class CompoundStructure(Base):
-
     __tablename__ = "compound_structure"
 
     sid = Column(Integer, primary_key=True)
@@ -33,7 +32,6 @@ class CompoundStructure(Base):
 
 
 class CompoundProperties(Base):
-
     __tablename__ = "compound_properties"
 
     pid = Column(Integer, primary_key=True)

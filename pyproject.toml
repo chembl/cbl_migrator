@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cbl_migrator"
+version = "0.3.7"
+description = "Migrates Oracle dbs to PostgreSQL, MySQL and SQLite"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Eloy Félix", email = "efelix@ebi.ac.uk" }
+]
+urls = { "Homepage" = "https://github.com/chembl/cbl_migrator" }
+dependencies = [
+    "SQLAlchemy~=2.0"
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13"
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+cbl-migrator = "cbl_migrator.bin.run_migrator:main"
+
+[tool.setuptools.packages.find]
+include = ["cbl_migrator", "cbl_migrator.bin"]
