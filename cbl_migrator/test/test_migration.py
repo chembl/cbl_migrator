@@ -91,11 +91,11 @@ class TestMigration:
         self.origin = "sqlite:///origin.db"
         self.dest = "sqlite:///dest.db"
         yield
+        # remove files after tests run
         os.remove("origin.db")
         os.remove("dest.db")
 
     def __gen_test_data(self):
-        # Same implementation as before...
         engine = create_engine(self.origin)
         Base.metadata.create_all(bind=engine)
 
@@ -133,7 +133,6 @@ class TestMigration:
             )
 
     def __get_tables_insp(self):
-        # Same implementation as before...
         o_eng = create_engine(self.origin)
         d_eng = create_engine(self.dest)
 
