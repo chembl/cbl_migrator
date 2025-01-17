@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cbl_migrator"
-version = "0.3.7"
+version = "0.3.8"
 description = "Migrates Oracle dbs to PostgreSQL, MySQL and SQLite"
 readme = "README.md"
 license = { text = "MIT" }
