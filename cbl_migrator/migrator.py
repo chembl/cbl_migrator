@@ -153,6 +153,7 @@ class DbMigrator:
         self.d_eng_conn = d_conn_string
         self.n_cores = n_workers
         self.exclude_fields = {f.split(".")[0]: f.split(".")[1] for f in exclude_fields}
+        print(self.exclude_fields)
 
         o_eng = create_engine(self.o_eng_conn)
         metadata = MetaData()
@@ -233,10 +234,12 @@ class DbMigrator:
             table.indexes = set()
 
             new_metadata_cols = ColumnCollection()
+            excluded_fields = self.exclude_fields.get(table_name, [])
             for col in table._columns:
-                col = self.__fix_column_type(col, o_eng.name, d_eng.name)
-                col.autoincrement = False
-                new_metadata_cols.add(col)
+                if col.name not in excluded_fields:
+                    col = self.__fix_column_type(col, o_eng.name, d_eng.name)
+                    col.autoincrement = False
+                    new_metadata_cols.add(col)
             table.columns = new_metadata_cols.as_readonly()
             new_metadata_tables[table_name] = table
 
@@ -286,7 +289,8 @@ class DbMigrator:
 
     def __copy_constraints(self):
         """
-        Migrates constraints to the destination DB (UK, CK, FK).
+        Migrates constraints to the destination DB (UK, CK, FK), skipping those
+        that involve excluded fields.
         """
         o_eng = create_engine(self.o_eng_conn)
         d_eng = create_engine(self.d_eng_conn)
@@ -299,30 +303,35 @@ class DbMigrator:
         )
         for table_name, table in tables:
             constraints_to_keep = []
+            excluded_fields = self.exclude_fields.get(table_name, [])
 
-            # Unique constraints
+            # Unique constraints - skip if any column is excluded
             uks = insp.get_unique_constraints(table_name)
             for uk in uks:
-                uk_cols = [c for c in table._columns if c.name in uk["column_names"]]
-                uuk = UniqueConstraint(*uk_cols, name=uk["name"])
-                uuk._set_parent(table)
-                constraints_to_keep.append(uuk)
+                if not any(col in excluded_fields for col in uk["column_names"]):
+                    uk_cols = [c for c in table._columns if c.name in uk["column_names"]]
+                    uuk = UniqueConstraint(*uk_cols, name=uk["name"])
+                    uuk._set_parent(table)
+                    constraints_to_keep.append(uuk)
 
-            # Check constraints
+            # Check constraints - skip if any column is excluded
             ccs = [
                 cons for cons in table.constraints if isinstance(cons, CheckConstraint)
             ]
             for cc in ccs:
-                cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
-                constraints_to_keep.append(cc)
+                if not any(col in str(cc.sqltext) for col in excluded_fields):
+                    cc.sqltext = TextClause(str(cc.sqltext).replace('"', ""))
+                    constraints_to_keep.append(cc)
 
-            # Foreign keys
+            # Foreign keys - skip if any column is excluded
             fks = [
                 cons
                 for cons in table.constraints
                 if isinstance(cons, ForeignKeyConstraint)
             ]
-            constraints_to_keep.extend(fks)
+            for fk in fks:
+                if not any(col.name in excluded_fields for col in fk.columns):
+                    constraints_to_keep.append(fk)
 
             # Create constraints
             for cons in constraints_to_keep:
@@ -335,7 +344,8 @@ class DbMigrator:
     def __copy_indexes(self):
         """
         Creates indexes in the destination DB, skipping those
-        already defined via unique or primary constraints.
+        already defined via unique or primary constraints and
+        those involving excluded fields.
         """
         o_eng = create_engine(self.o_eng_conn)
         d_eng = create_engine(self.d_eng_conn)
@@ -347,13 +357,16 @@ class DbMigrator:
             lambda x: x[0] not in self.exclude_tables, metadata.tables.items()
         )
         for table_name, table in tables:
+            excluded_fields = self.exclude_fields.get(table_name, [])
             uks = insp.get_unique_constraints(table_name)
             pk = insp.get_pk_constraint(table_name)
 
             indexes_to_keep = [
                 idx
                 for idx in table.indexes
-                if idx.name not in [u["name"] for u in uks] and idx.name != pk["name"]
+                if idx.name not in [u["name"] for u in uks]
+                and idx.name != pk["name"]
+                and not any(col.name in excluded_fields for col in idx.columns)
             ]
             for index in indexes_to_keep:
                 try:
