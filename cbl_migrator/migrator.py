@@ -19,20 +19,6 @@ from .conv import COLTYPE_CONV
 from .logs import logger
 
 
-def insert_rows_in_dest(table, data, d_eng):
-    """
-    Inserts the list of rows into the destination table.
-    """
-    with d_eng.begin() as conn:
-        conn.execute(
-            table.insert(),
-            [
-                dict(zip(res_keys, row))
-                for res_keys, row in zip([data.keys()] * len(data.all()), data.all())
-            ],
-        )
-
-
 def chunked_copy_single_pk(table, pk, last_id, chunk_size, o_eng, d_eng):
     """
     Copies table data in chunks, assuming a single PK column.
@@ -309,7 +295,9 @@ class DbMigrator:
             uks = insp.get_unique_constraints(table_name)
             for uk in uks:
                 if not any(col in excluded_fields for col in uk["column_names"]):
-                    uk_cols = [c for c in table._columns if c.name in uk["column_names"]]
+                    uk_cols = [
+                        c for c in table._columns if c.name in uk["column_names"]
+                    ]
                     uuk = UniqueConstraint(*uk_cols, name=uk["name"])
                     uuk._set_parent(table)
                     constraints_to_keep.append(uuk)
@@ -416,8 +404,8 @@ class DbMigrator:
         # Fill tables with data
         if copy_data:
             metadata = MetaData()
-            metadata.reflect(o_eng)
-            insp = inspect(o_eng)
+            metadata.reflect(d_eng)
+            insp = inspect(d_eng)
             table_names = [
                 t
                 for t, _ in insp.get_sorted_table_and_fkc_names()
