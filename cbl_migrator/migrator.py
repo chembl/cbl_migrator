@@ -133,18 +133,26 @@ class DbMigrator:
         o_conn_string (str): Origin DB connection string.
         d_conn_string (str): Destination DB connection string.
         exclude (list[str]): List of tables to exclude from migration.
+        exclude_fields (list[str]): List of fields to exclude in format 'table.field'.
         n_cores (int): Number of processes used for data copying.
-
-    Methods:
-        migrate: Executes the migration pipeline.
     """
 
-    def __init__(self, o_conn_string, d_conn_string, exclude=None, n_workers=4):
-        if exclude is None:
-            exclude = []
+    def __init__(
+        self,
+        o_conn_string,
+        d_conn_string,
+        exclude_tables=None,
+        exclude_fields=None,
+        n_workers=4,
+    ):
+        if exclude_tables is None:
+            exclude_tables = []
+        if exclude_fields is None:
+            exclude_fields = []
         self.o_eng_conn = o_conn_string
         self.d_eng_conn = d_conn_string
         self.n_cores = n_workers
+        self.exclude_fields = {f.split(".")[0]: f.split(".")[1] for f in exclude_fields}
 
         o_eng = create_engine(self.o_eng_conn)
         metadata = MetaData()
@@ -154,7 +162,7 @@ class DbMigrator:
             for t, table in metadata.tables.items()
             if not list(table.primary_key.columns)
         ]
-        self.exclude = exclude + no_pk
+        self.exclude_tables = exclude_tables + no_pk
 
     def __fix_column_type(self, col, o_eng, d_eng):
         """
@@ -190,7 +198,9 @@ class DbMigrator:
         insp = inspect(o_eng)
 
         new_metadata_tables = {}
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude_tables, metadata.tables.items()
+        )
         for table_name, table in tables:
             # Keep only PK constraints unless it's SQLite
             keep_constraints = [
@@ -246,10 +256,14 @@ class DbMigrator:
         d_metadata.reflect(d_eng)
 
         o_tables = {
-            t: tbl for t, tbl in o_metadata.tables.items() if t not in self.exclude
+            t: tbl
+            for t, tbl in o_metadata.tables.items()
+            if t not in self.exclude_tables
         }
         d_tables = {
-            t: tbl for t, tbl in d_metadata.tables.items() if t not in self.exclude
+            t: tbl
+            for t, tbl in d_metadata.tables.items()
+            if t not in self.exclude_tables
         }
 
         if set(o_tables.keys()) != set(d_tables.keys()):
@@ -280,7 +294,9 @@ class DbMigrator:
         metadata.reflect(o_eng)
         insp = inspect(o_eng)
 
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude_tables, metadata.tables.items()
+        )
         for table_name, table in tables:
             constraints_to_keep = []
 
@@ -327,7 +343,9 @@ class DbMigrator:
         metadata.reflect(o_eng)
         insp = inspect(o_eng)
 
-        tables = filter(lambda x: x[0] not in self.exclude, metadata.tables.items())
+        tables = filter(
+            lambda x: x[0] not in self.exclude_tables, metadata.tables.items()
+        )
         for table_name, table in tables:
             uks = insp.get_unique_constraints(table_name)
             pk = insp.get_pk_constraint(table_name)
@@ -390,7 +408,7 @@ class DbMigrator:
             table_names = [
                 t
                 for t, _ in insp.get_sorted_table_and_fkc_names()
-                if t and t not in self.exclude
+                if t and t not in self.exclude_tables
             ]
             tables = [metadata.tables[t] for t in table_names]
 
