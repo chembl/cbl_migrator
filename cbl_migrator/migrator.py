@@ -148,10 +148,10 @@ class DbMigrator:
         self.n_cores = n_workers
         self.exclude_fields = {}
         for item in exclude_fields:
-            table, field = item.split(".")
+            table, field = item.lower().split(".")
             if table not in self.exclude_fields:
-                self.exclude_fields[table.lower()] = []
-            self.exclude_fields[table.lower()].append(field.lower())
+                self.exclude_fields[table] = []
+            self.exclude_fields[table].append(field)
 
         o_eng = create_engine(self.o_eng_conn)
         metadata = MetaData()
