@@ -20,44 +20,87 @@ from .logs import logger
 
 
 def chunked_copy_single_pk(table, pk, last_id, chunk_size, o_eng, d_eng):
-    """
-    Copies table data in chunks, assuming a single PK column.
-    """
-    first_it = True if last_id is None else False
     while True:
         q = select(table).order_by(pk).limit(chunk_size)
-        if not first_it:
+        if last_id is not None:
             q = q.where(pk > last_id)
-        else:
-            first_it = False
-        with o_eng.connect() as connr:
-            res = connr.execute(q)
-            data = res.all()
-            if data:
-                last_id = getattr(data[-1], pk.name)
-                with d_eng.begin() as conn:
-                    conn.execute(
-                        table.insert(),
-                        [dict(zip(res.keys(), row)) for row in data],
-                    )
-            else:
+
+        with o_eng.connect().execution_options(stream_results=True) as connr:
+            result = connr.execute(q)
+            chunk = result.fetchmany(chunk_size)
+            if not chunk:
                 break
 
-
-def chunked_copy_multi_pk(table, pks, count, offset, chunk_size, o_eng, d_eng):
-    """
-    Copies table data in chunks, assuming a composite PK.
-    """
-    for ini in range(offset, count - offset, chunk_size):
-        q = select(table).order_by(*pks).offset(ini).limit(chunk_size)
-        with o_eng.connect() as connr:
-            res = connr.execute(q)
-            data = res.all()
+            last_id = getattr(chunk[-1], pk.name)
             with d_eng.begin() as conn:
                 conn.execute(
-                    table.insert(),
-                    [dict(zip(res.keys(), row)) for row in data],
+                    table.insert(), [dict(zip(result.keys(), row)) for row in chunk]
                 )
+
+
+def chunked_copy_multi_pk(table, pks, offset, chunk_size, o_eng, d_eng):
+    with o_eng.connect().execution_options(stream_results=True) as connr:
+        q = select(table).order_by(*pks)
+        result = connr.execute(q)
+        if offset:
+            result.fetchmany(offset)
+
+        while True:
+            chunk = result.fetchmany(chunk_size)
+            if not chunk:
+                break
+
+            with d_eng.begin() as conn:
+                conn.execute(
+                    table.insert(), [dict(zip(result.keys(), row)) for row in chunk]
+                )
+
+
+def get_ordering_columns(table, insp):
+    """
+    Get columns to use for consistent ordering of tables without PKs.
+    Returns:
+    - First unique index columns if found (guaranteed uniqueness)
+    - First unique constraint columns if found (guaranteed uniqueness)
+    - All columns as last resort (guaranteed uniqueness but slower)
+    """
+    indexes = insp.get_indexes(table.name)
+    for idx in indexes:
+        if idx["unique"]:
+            return [table.c[name] for name in idx["column_names"]]
+
+    unique_constraints = insp.get_unique_constraints(table.name)
+    if unique_constraints:
+        return [table.c[name] for name in unique_constraints[0]["column_names"]]
+
+    logger.warning(
+        f"No unique constraints found for table '{table.name}', "
+        "using all columns for ordering which may impact performance"
+    )
+    return list(table.columns)
+
+
+def chunked_copy_no_pk(table, chunk_size, o_eng, d_eng):
+    """
+    Copies table data in chunks for tables without primary keys using OFFSET/LIMIT pagination.
+    """
+    insp = inspect(o_eng)
+    ordering_cols = get_ordering_columns(table, insp)
+
+    offset = 0
+    while True:
+        with o_eng.connect().execution_options(stream_results=True) as connr:
+            q = select(table).order_by(*ordering_cols).offset(offset).limit(chunk_size)
+            result = connr.execute(q)
+            chunk = result.fetchall()
+            if not chunk:
+                break
+
+            with d_eng.begin() as conn:
+                conn.execute(
+                    table.insert(), [dict(zip(result.keys(), row)) for row in chunk]
+                )
+            offset += chunk_size
 
 
 def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
@@ -81,6 +124,12 @@ def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
         o_eng.dialect.max_identifier_length = d_eng.dialect.max_identifier_length
 
     pks = [c for c in table.primary_key.columns]
+
+    if not pks:
+        logger.info(f"Table '{table.name}' has no primary key, using offset pagination")
+        chunked_copy_no_pk(table, chunk_size, o_eng, d_eng)
+        return True
+
     single_pk = len(pks) == 1
     pk = pks[0] if pks else None
 
@@ -113,7 +162,7 @@ def fill_table(o_eng_conn, d_eng_conn, table, chunk_size):
         chunked_copy_single_pk(table, pk, last_id, chunk_size, o_eng, d_eng)
     else:
         offset = d_count if last_id else 0
-        chunked_copy_multi_pk(table, pks, count, offset, chunk_size, o_eng, d_eng)
+        chunked_copy_multi_pk(table, pks, offset, chunk_size, o_eng, d_eng)
 
     logger.info(f"Successfully completed migration of table '{table.name}'")
     return True
@@ -152,16 +201,7 @@ class DbMigrator:
             if table not in self.exclude_fields:
                 self.exclude_fields[table] = []
             self.exclude_fields[table].append(field)
-
-        o_eng = create_engine(self.o_eng_conn)
-        metadata = MetaData()
-        metadata.reflect(o_eng)
-        no_pk = [
-            table_name.lower()
-            for table_name, table in metadata.tables.items()
-            if not list(table.primary_key.columns)
-        ]
-        self.exclude_tables = exclude_tables + no_pk
+        self.exclude_tables = [t.lower() for t in exclude_tables]
 
     def __fix_column_type(self, col, o_eng, d_eng):
         """
@@ -413,7 +453,7 @@ class DbMigrator:
         copy_data=True,
         copy_constraints=True,
         copy_indexes=True,
-        chunk_size=1000,
+        chunk_size=64000,
     ):
         """
         Orchestrates the migration from the origin DB to the destination DB.

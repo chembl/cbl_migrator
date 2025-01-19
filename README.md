@@ -32,7 +32,6 @@ cbl-migrator "oracle://{user}:{pass}@{host}:{port}/?service_name={service_name}&
 - Logs objects that fail to migrate.
 
 ## What It Does Not Do
-- Avoids tables without PKs (may hang if a unique field is referenced by an FK).  
 - Ignores server default values, autoincrement fields, triggers, and procedures.
 
 ## SQLite
